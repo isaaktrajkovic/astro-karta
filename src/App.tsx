@@ -17,6 +17,7 @@ import Order from "./pages/Order";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/order/:productId" element={<Order />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/faq" element={<FAQ />} />
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <Dashboard />
