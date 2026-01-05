@@ -15,4 +15,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    esbuild: {
+      drop: ['debugger'],
+      minify: true,
+    },
+  },
 }));
