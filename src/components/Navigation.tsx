@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sparkles, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import logo from '@/assets/logo-minimal.svg';
 
 const languages = [
   { code: 'sr', label: 'Srpski', flag: '🇷🇸' },
@@ -42,8 +43,12 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <Sparkles className="w-6 h-6 text-primary group-hover:text-accent transition-colors duration-300" />
-            <span className="text-xl font-bold text-gradient">AstroKarta</span>
+            <img
+              src={logo}
+              alt="Astro whisper logo"
+              className="w-8 h-8 transition-transform duration-300 group-hover:scale-105"
+            />
+            <span className="text-xl font-bold text-gradient">Astro whisper</span>
           </Link>
 
           {/* Desktop Navigation */}
