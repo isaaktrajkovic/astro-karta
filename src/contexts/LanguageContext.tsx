@@ -14,6 +14,15 @@ interface Translations {
 }
 
 export const translations: Translations = {
+  // Brand
+  'brand.name': { 
+    sr: 'Astro whisper', 
+    en: 'Astro whisper', 
+    fr: 'Astro whisper', 
+    de: 'Astro whisper', 
+    es: 'Astro whisper', 
+    ru: 'Astro whisper' 
+  },
   // Navigation
   'nav.home': { 
     sr: 'Početna', 

@@ -48,7 +48,7 @@ const Navigation = () => {
               alt="Astro whisper logo"
               className="w-8 h-8 transition-transform duration-300 group-hover:scale-105"
             />
-            <span className="text-xl font-bold text-gradient">Astro whisper</span>
+            <span className="text-xl font-bold text-gradient">{t('brand.name')}</span>
           </Link>
 
           {/* Desktop Navigation */}
