@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  // Use relative asset paths so builds work when deployed to a subfolder (e.g. Hostinger)
+  base: "./",
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
