@@ -1,8 +1,13 @@
 Options -MultiViews
 RewriteEngine On
 RewriteBase /
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+
+# Ne diraj postojeće fajlove (posebno /assets/**)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# SPA rewrite
 RewriteRule . /index.html [L]
 
 # Relaksira CSP da dozvoli 'unsafe-eval' (potrebno jer Recharts/XLSX/React bundle koristi new Function/eval).
