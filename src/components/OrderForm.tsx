@@ -5,8 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
+import { createOrder } from '@/lib/api';
 
 interface OrderFormProps {
   productId: string;
@@ -61,7 +61,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         fullNote = partnerInfo + (formData.note ? `\n\n${formData.note}` : '');
       }
 
-      const { error } = await supabase.from('orders').insert({
+      await createOrder({
         product_id: productId,
         product_name: productName,
         customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -76,27 +76,6 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         note: fullNote || null,
         consultation_description: isConsultation ? formData.consultationDescription : null,
       });
-
-      if (error) throw error;
-
-      // Send email notification
-      try {
-        await supabase.functions.invoke('send-order-notification', {
-          body: {
-            customerName: `${formData.firstName} ${formData.lastName}`.trim(),
-            email: formData.email,
-            productName: productName,
-            birthDate: formData.birthDate,
-            birthPlace: `${formData.birthCity}, ${formData.birthCountry}`,
-            birthTime: formData.birthTime || undefined,
-            note: fullNote || undefined,
-          },
-        });
-        console.log('Email notification sent');
-      } catch (emailError) {
-        console.error('Error sending email notification:', emailError);
-        // Don't fail the order if email fails
-      }
 
       toast({
         title: t('form.success'),
@@ -126,7 +105,9 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       console.error('Error submitting order:', error);
       toast({
         title: language === 'sr' ? 'Greška' : 'Error',
-        description: language === 'sr' ? 'Došlo je do greške. Pokušajte ponovo.' : 'An error occurred. Please try again.',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr' ? 'Došlo je do greške. Pokušajte ponovo.' : 'An error occurred. Please try again.'),
         variant: 'destructive',
       });
     } finally {

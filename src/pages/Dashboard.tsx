@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
+import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus } from '@/lib/api';
 import {
   Select,
   SelectContent,
@@ -16,19 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface Order {
-  id: string;
-  product_id: string;
-  product_name: string;
-  customer_name: string;
-  birth_date: string;
-  birth_time: string | null;
-  birth_place: string;
-  email: string;
-  note: string | null;
-  status: string;
-  created_at: string;
-}
+type Order = ApiOrder;
 
 type StatusFilter = 'all' | 'pending' | 'processing' | 'completed';
 type TimeFilter = 'all' | 'today' | 'week' | 'month' | 'year';
@@ -80,19 +68,14 @@ const Dashboard = () => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
   const [zodiacFilter, setZodiacFilter] = useState<ZodiacSign>('all');
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [usageDialogOpen, setUsageDialogOpen] = useState(false);
 
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders(data || []);
+      const { orders } = await getOrders();
+      setOrders(orders || []);
       setSelectedOrders(new Set());
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -108,25 +91,16 @@ const Dashboard = () => {
 
   const fetchCalculatorUsage = async () => {
     try {
-      const { count, error } = await supabase
-        .from('calculator_usage')
-        .select('*', { count: 'exact', head: true });
-
-      if (error) throw error;
-      setCalculatorUsageCount(count || 0);
+      const { usage } = await getUsage();
+      setCalculatorUsageCount(usage?.length || 0);
     } catch (error) {
       console.error('Error fetching calculator usage:', error);
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: number, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
-
-      if (error) throw error;
+      await apiUpdateOrderStatus(orderId, newStatus);
 
       setOrders((prev) =>
         prev.map((order) =>
@@ -151,26 +125,6 @@ const Dashboard = () => {
   useEffect(() => {
     fetchOrders();
     fetchCalculatorUsage();
-
-    // Subscribe to realtime changes for calculator usage
-    const channel = supabase
-      .channel('calculator_usage_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'calculator_usage',
-        },
-        () => {
-          fetchCalculatorUsage();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   // Get unique products for filter
@@ -238,7 +192,7 @@ const Dashboard = () => {
     }
   };
 
-  const toggleSelectOrder = (orderId: string) => {
+  const toggleSelectOrder = (orderId: number) => {
     const newSelected = new Set(selectedOrders);
     if (newSelected.has(orderId)) {
       newSelected.delete(orderId);

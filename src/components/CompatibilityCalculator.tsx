@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Heart, Sparkles } from 'lucide-react';
 import CompatibilityResultDialog from './CompatibilityResultDialog';
-import { supabase } from '@/integrations/supabase/client';
+import { trackUsage } from '@/lib/api';
 
 const zodiacSigns = [
   { name: 'aries', symbol: '♈', start: [3, 21], end: [4, 19] },
@@ -163,7 +163,7 @@ const CompatibilityCalculator = () => {
 
     // Track calculator usage
     try {
-      await supabase.from('calculator_usage').insert({
+      await trackUsage({
         sign1: sign1.name,
         sign2: sign2.name,
         compatibility: compatibility,

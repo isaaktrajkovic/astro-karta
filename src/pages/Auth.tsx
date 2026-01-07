@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Lock, Mail } from 'lucide-react';
+import { getSession, login } from '@/lib/api';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -16,19 +16,15 @@ const Auth = () => {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    let isMounted = true;
+    getSession().then((session) => {
+      if (session && isMounted) {
         navigate('/dashboard');
       }
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/dashboard');
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -36,39 +32,8 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: 'Greška pri prijavi',
-          description: error.message === 'Invalid login credentials' 
-            ? 'Pogrešan email ili lozinka' 
-            : error.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (data.session) {
-        // Send login notification email
-        try {
-          await supabase.functions.invoke('send-login-notification', {
-            body: { 
-              email: data.user?.email,
-              loginTime: new Date().toLocaleString('sr-RS', { 
-                timeZone: 'Europe/Belgrade',
-                dateStyle: 'full',
-                timeStyle: 'medium'
-              })
-            }
-          });
-        } catch (emailError) {
-          console.error('Failed to send login notification:', emailError);
-        }
-
+      const { user } = await login(email, password);
+      if (user) {
         toast({
           title: 'Uspešna prijava',
           description: 'Dobrodošli nazad!',
@@ -77,9 +42,12 @@ const Auth = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
+      const message = error instanceof Error ? error.message : 'Došlo je do greške. Pokušajte ponovo.';
       toast({
-        title: 'Greška',
-        description: 'Došlo je do greške. Pokušajte ponovo.',
+        title: 'Greška pri prijavi',
+        description: message === 'Invalid login credentials'
+          ? 'Pogrešan email ili lozinka'
+          : message,
         variant: 'destructive',
       });
     } finally {

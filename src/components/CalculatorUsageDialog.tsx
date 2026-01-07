@@ -18,7 +18,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Select,
   SelectContent,
@@ -26,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { getUsage } from '@/lib/api';
 
 interface DailyUsage {
   date: string;
@@ -48,16 +48,11 @@ export const CalculatorUsageDialog = ({ open, onOpenChange }: CalculatorUsageDia
   const fetchDailyUsage = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('calculator_usage')
-        .select('created_at')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { usage } = await getUsage();
 
       // Group by date
       const usageByDate: Record<string, number> = {};
-      data?.forEach((item) => {
+      usage?.forEach((item) => {
         const date = format(new Date(item.created_at), 'yyyy-MM-dd');
         usageByDate[date] = (usageByDate[date] || 0) + 1;
       });
