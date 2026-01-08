@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     q: "Da li je plaćanje sigurno?",
-    a: "Da, obrađuje se preko verifikovanih provajdera (Stripe, PayPal); kartice ne vidimo mi."
+    a: "Trenutno je naplata privremeno isključena dok ne završimo tehničku migraciju."
   },
   {
     q: "Postoje li direktne konsultacije sa astrologom?",

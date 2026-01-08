@@ -12,5 +12,5 @@ RewriteRule . /index.html [L]
 
 # Relaksira CSP da dozvoli 'unsafe-eval' (potrebno jer Recharts/XLSX/React bundle koristi new Function/eval).
 <IfModule mod_headers.c>
-  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval' https://js.stripe.com; script-src-elem 'self' https://js.stripe.com; connect-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'self';"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval'; script-src-elem 'self'; connect-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; frame-src 'self'; frame-ancestors 'self';"
 </IfModule>

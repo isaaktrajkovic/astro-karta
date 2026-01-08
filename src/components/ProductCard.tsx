@@ -2,9 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderDialog from '@/components/OrderDialog';
-import { startStripeCheckout } from '@/lib/stripeCheckout';
-import { getStripeProduct } from '@/config/stripeProducts';
-import { toast } from '@/hooks/use-toast';
 
 interface ProductCardProps {
   id: string;
@@ -19,36 +16,9 @@ interface ProductCardProps {
 const ProductCard = ({ id, title, description, price, image, badge, isConsultation = false }: ProductCardProps) => {
   const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
 
   const handleOrder = async () => {
-    const stripeConfig = getStripeProduct(id);
-
-    // Fallback to form dialog if Stripe price not configured
-    if (!stripeConfig) {
-      setIsDialogOpen(true);
-      return;
-    }
-
-    setIsPaying(true);
-    try {
-      await startStripeCheckout({
-        mode: stripeConfig.mode,
-        priceId: stripeConfig.priceId,
-        anchorToMonthStart: stripeConfig.mode === 'subscription',
-      });
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: t('nav.products'),
-        description: t('hero.subtitle'),
-        variant: 'destructive',
-      });
-      // If checkout fails, allow manual order form as a backup
-      setIsDialogOpen(true);
-    } finally {
-      setIsPaying(false);
-    }
+    setIsDialogOpen(true);
   };
 
   return (
@@ -85,10 +55,9 @@ const ProductCard = ({ id, title, description, price, image, badge, isConsultati
               type="button"
               variant="cosmic" 
               size="sm"
-              disabled={isPaying}
               onClick={handleOrder}
             >
-              {isPaying ? '...' : t('products.order')}
+              {t('products.order')}
             </Button>
           </div>
         </div>
