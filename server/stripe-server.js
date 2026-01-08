@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import OpenAI from 'openai';
 import crypto from 'crypto';
-import mysql from 'mysql2/promise';
+import pg from 'pg';
 
 dotenv.config();
 
@@ -18,33 +18,47 @@ const adminPassword = process.env.ADMIN_PASSWORD || '';
 const resendApiKey = process.env.RESEND_API_KEY || '';
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || '';
 const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL || adminEmail;
-const dbHost = process.env.DB_HOST || '';
-const dbUser = process.env.DB_USER || '';
-const dbPassword = process.env.DB_PASSWORD || '';
-const dbName = process.env.DB_NAME || '';
-const dbPort = Number(process.env.DB_PORT || 3306);
+const databaseUrl = process.env.DATABASE_URL || '';
+const pgHost = process.env.PGHOST || '';
+const pgUser = process.env.PGUSER || '';
+const pgPassword = process.env.PGPASSWORD || '';
+const pgDatabase = process.env.PGDATABASE || '';
+const pgPort = Number(process.env.PGPORT || 5432);
+const pgSslMode = process.env.PGSSLMODE || '';
 
 const openai =
   openaiApiKey.trim() !== ''
     ? new OpenAI({ apiKey: openaiApiKey })
     : null;
 
+const { Pool } = pg;
+const isRender = Boolean(process.env.RENDER) || Boolean(process.env.RENDER_SERVICE_ID);
+const shouldUseSsl =
+  isRender ||
+  pgSslMode === 'require' ||
+  pgSslMode === 'verify-full' ||
+  (databaseUrl && databaseUrl.includes('render.com'));
+const sslConfig = shouldUseSsl ? { rejectUnauthorized: false } : undefined;
+
 const pool =
-  dbHost && dbUser && dbName
-    ? mysql.createPool({
-        host: dbHost,
-        user: dbUser,
-        password: dbPassword,
-        database: dbName,
-        port: dbPort,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
+  databaseUrl
+    ? new Pool({
+        connectionString: databaseUrl,
+        ssl: sslConfig,
       })
+    : pgHost && pgUser && pgDatabase
+      ? new Pool({
+          host: pgHost,
+          user: pgUser,
+          password: pgPassword,
+          database: pgDatabase,
+          port: pgPort,
+          ssl: sslConfig,
+        })
     : null;
 
 if (!pool) {
-  console.warn('⚠️ Database is not configured. Set DB_HOST/DB_USER/DB_NAME in .env.');
+  console.warn('⚠️ Database is not configured. Set DATABASE_URL or PGHOST/PGUSER/PGDATABASE in .env.');
 }
 
 if (!authSecret) {
@@ -270,11 +284,11 @@ app.post('/api/auth/login', async (req, res) => {
 
   if (pool) {
     try {
-      const [rows] = await pool.execute(
-        'SELECT id, email, password_hash, status FROM admins WHERE email = ? LIMIT 1',
+      const { rows } = await pool.query(
+        'SELECT id, email, password_hash, status FROM admins WHERE email = $1 LIMIT 1',
         [normalizedEmail]
       );
-      if (Array.isArray(rows) && rows.length > 0) {
+      if (rows.length > 0) {
         dbAdmin = rows[0];
       }
     } catch (error) {
@@ -291,7 +305,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (pool) {
-      await pool.execute('UPDATE admins SET last_login = NOW() WHERE id = ?', [dbAdmin.id]);
+      await pool.query('UPDATE admins SET last_login = NOW() WHERE id = $1', [dbAdmin.id]);
     }
 
     const token = signToken({ email: normalizedEmail, adminId: dbAdmin.id, role: 'admin' });
@@ -346,22 +360,22 @@ app.post('/api/admins', requireAuth, async (req, res) => {
   const normalizedEmail = String(email).trim().toLowerCase();
 
   try {
-    const [existing] = await pool.execute(
-      'SELECT id FROM admins WHERE email = ? LIMIT 1',
+    const { rows: existingRows } = await pool.query(
+      'SELECT id FROM admins WHERE email = $1 LIMIT 1',
       [normalizedEmail]
     );
 
-    if (Array.isArray(existing) && existing.length > 0) {
+    if (existingRows.length > 0) {
       return res.status(409).json({ error: 'Admin already exists' });
     }
 
     const passwordHash = hashPassword(password);
-    const [result] = await pool.execute(
-      'INSERT INTO admins (email, password_hash, name) VALUES (?, ?, ?)',
+    const { rows } = await pool.query(
+      'INSERT INTO admins (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id',
       [normalizedEmail, passwordHash, name || null]
     );
 
-    return res.status(201).json({ success: true, adminId: result.insertId });
+    return res.status(201).json({ success: true, adminId: rows[0]?.id });
   } catch (error) {
     console.error('Failed to create admin:', error);
     return res.status(500).json({ error: 'Failed to create admin' });
@@ -405,7 +419,7 @@ app.post('/api/orders', async (req, res) => {
   }
 
   try {
-    const [result] = await pool.execute(
+    const { rows } = await pool.query(
       `INSERT INTO orders (
         product_id,
         product_name,
@@ -420,7 +434,8 @@ app.post('/api/orders', async (req, res) => {
         email,
         note,
         consultation_description
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id`,
       [
         product_id,
         product_name,
@@ -448,7 +463,7 @@ app.post('/api/orders', async (req, res) => {
       note,
     });
 
-    return res.status(201).json({ success: true, orderId: result.insertId });
+    return res.status(201).json({ success: true, orderId: rows[0]?.id });
   } catch (error) {
     console.error('Failed to create order:', error);
     return res.status(500).json({ error: 'Failed to create order' });
@@ -461,7 +476,7 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
   }
 
   try {
-    const [rows] = await pool.execute(
+    const { rows } = await pool.query(
       `SELECT
         id,
         product_id,
@@ -502,7 +517,7 @@ app.patch('/api/orders/:id', requireAuth, async (req, res) => {
   }
 
   try {
-    await pool.execute('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id]);
+    await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, req.params.id]);
     return res.json({ success: true });
   } catch (error) {
     console.error('Failed to update order:', error);
@@ -522,8 +537,8 @@ app.post('/api/usage', async (req, res) => {
   }
 
   try {
-    await pool.execute(
-      'INSERT INTO calculator_usage (sign1, sign2, compatibility) VALUES (?, ?, ?)',
+    await pool.query(
+      'INSERT INTO calculator_usage (sign1, sign2, compatibility) VALUES ($1, $2, $3)',
       [sign1, sign2, compatibility]
     );
     return res.status(201).json({ success: true });
@@ -539,7 +554,7 @@ app.get('/api/usage', requireAuth, async (_req, res) => {
   }
 
   try {
-    const [rows] = await pool.execute(
+    const { rows } = await pool.query(
       `SELECT id, sign1, sign2, compatibility, created_at
        FROM calculator_usage
        ORDER BY created_at DESC`
