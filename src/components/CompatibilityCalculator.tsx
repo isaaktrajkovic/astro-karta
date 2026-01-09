@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,21 +52,33 @@ const compatibilityMatrix: { [key: string]: number } = {
 const apiBase = import.meta.env.VITE_API_BASE_URL || '';
 const llmEnabled = import.meta.env.VITE_COMPATIBILITY_LLM === 'true';
 
-const parseDateString = (dateStr: string): Date | null => {
+const parseDateString = (dateStr: string, dayFirst = false): Date | null => {
   // Accept ISO (YYYY-MM-DD) or legacy MM/DD/YYYY style inputs
   if (!dateStr) return null;
 
-  const normalized = dateStr.trim().replace(/[./]/g, '-').replace(/\//g, '-');
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split('-').map((p) => parseInt(p, 10));
+    const date = new Date(year, month - 1, day);
+    if (
+      date.getFullYear() === year &&
+      date.getMonth() + 1 === month &&
+      date.getDate() === day
+    ) {
+      return date;
+    }
+    return null;
+  }
+
+  const normalized = trimmed.replace(/[./]/g, '-').replace(/\//g, '-');
   const parts = normalized.split('-').filter(Boolean);
   if (parts.length !== 3) return null;
 
   let year: number, month: number, day: number;
 
-  if (parts[0].length === 4) {
-    // ISO style: YYYY-MM-DD
-    [year, month, day] = parts.map((p) => parseInt(p, 10));
+  if (dayFirst) {
+    [day, month, year] = parts.map((p) => parseInt(p, 10));
   } else {
-    // Fallback: MM-DD-YYYY
     [month, day, year] = parts.map((p) => parseInt(p, 10));
   }
 
@@ -126,6 +138,25 @@ const CompatibilityCalculator = () => {
   } | null>(null);
   const maxDate = new Date().toISOString().split('T')[0];
   const [isLoadingDescription, setIsLoadingDescription] = useState(false);
+  const [isMobileDateInput, setIsMobileDateInput] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(hover: none) and (pointer: coarse)');
+    const update = () => setIsMobileDateInput(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener('change', update);
+    return () => mediaQuery.removeEventListener('change', update);
+  }, []);
+
+  const formatDayFirstDateInput = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 2));
+    if (digits.length > 2) parts.push(digits.slice(2, 4));
+    if (digits.length > 4) parts.push(digits.slice(4, 8));
+    return parts.join('/');
+  };
 
   const fetchLlmDescription = async (sign1: string, sign2: string, compatibility: number) => {
     if (!llmEnabled) {
@@ -154,8 +185,8 @@ const CompatibilityCalculator = () => {
   };
 
   const handleCalculate = async () => {
-    const parsedDate1 = parseDateString(date1);
-    const parsedDate2 = parseDateString(date2);
+    const parsedDate1 = parseDateString(date1, isMobileDateInput);
+    const parsedDate2 = parseDateString(date2, isMobileDateInput);
     
     if (!parsedDate1 || !parsedDate2) return;
 
@@ -181,7 +212,7 @@ const CompatibilityCalculator = () => {
   };
 
   const isValidDate = (dateStr: string) => {
-    return parseDateString(dateStr) !== null;
+    return parseDateString(dateStr, isMobileDateInput) !== null;
   };
 
   const canCalculate = isValidDate(date1) && isValidDate(date2);
@@ -211,11 +242,13 @@ const CompatibilityCalculator = () => {
             </Label>
             <Input
               id="date1"
-              type="date"
-              placeholder={t('compatibility.selectDate')}
+              type={isMobileDateInput ? 'text' : 'date'}
+              placeholder={isMobileDateInput ? 'dd/mm/yyyy' : t('compatibility.selectDate')}
               value={date1}
-              onChange={(e) => setDate1(e.target.value)}
+              onChange={(e) => setDate1(isMobileDateInput ? formatDayFirstDateInput(e.target.value) : e.target.value)}
               max={maxDate}
+              inputMode={isMobileDateInput ? 'numeric' : undefined}
+              pattern={isMobileDateInput ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
               className="w-full md:w-[180px] bg-background/50 border-border focus:border-primary text-center"
             />
           </div>
@@ -232,11 +265,13 @@ const CompatibilityCalculator = () => {
             </Label>
             <Input
               id="date2"
-              type="date"
-              placeholder={t('compatibility.selectDate')}
+              type={isMobileDateInput ? 'text' : 'date'}
+              placeholder={isMobileDateInput ? 'dd/mm/yyyy' : t('compatibility.selectDate')}
               value={date2}
-              onChange={(e) => setDate2(e.target.value)}
+              onChange={(e) => setDate2(isMobileDateInput ? formatDayFirstDateInput(e.target.value) : e.target.value)}
               max={maxDate}
+              inputMode={isMobileDateInput ? 'numeric' : undefined}
+              pattern={isMobileDateInput ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
               className="w-full md:w-[180px] bg-background/50 border-border focus:border-primary text-center"
             />
           </div>
