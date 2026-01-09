@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,7 @@ interface OrderFormProps {
 const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }: OrderFormProps) => {
   const { t, language } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMobileDateInput, setIsMobileDateInput] = useState(false);
   
   // Check if this is a compatibility/love analysis product
   const isCompatibilityAnalysis = productId === 'report-love';
@@ -41,11 +42,89 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
     partnerBirthCountry: '',
   });
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(hover: none) and (pointer: coarse)');
+    const update = () => setIsMobileDateInput(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener('change', update);
+    return () => mediaQuery.removeEventListener('change', update);
+  }, []);
+
+  const formatDayFirstDateInput = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 2));
+    if (digits.length > 2) parts.push(digits.slice(2, 4));
+    if (digits.length > 4) parts.push(digits.slice(4, 8));
+    return parts.join('/');
+  };
+
+  const normalizeDateInput = (value: string, dayFirst: boolean) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+    const normalized = trimmed.replace(/[.\-]/g, '/');
+    const parts = normalized.split('/').map((part) => part.trim());
+    if (parts.length !== 3) return null;
+
+    const [first, second, year] = parts;
+    const day = dayFirst ? first : second;
+    const month = dayFirst ? second : first;
+
+    if (!/^\d{1,2}$/.test(day) || !/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year)) {
+      return null;
+    }
+
+    const dayNum = Number(day);
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+    if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return null;
+
+    const date = new Date(yearNum, monthNum - 1, dayNum);
+    if (
+      date.getFullYear() !== yearNum ||
+      date.getMonth() + 1 !== monthNum ||
+      date.getDate() !== dayNum
+    ) {
+      return null;
+    }
+
+    return `${year}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      const normalizedBirthDate = normalizeDateInput(formData.birthDate, isMobileDateInput);
+      if (!normalizedBirthDate) {
+        toast({
+          title: language === 'sr' ? 'Neispravan datum' : 'Invalid date',
+          description: language === 'sr'
+            ? 'Unesite datum u formatu dd/mm/yyyy.'
+            : 'Enter the date in dd/mm/yyyy format.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (isCompatibilityAnalysis) {
+        const normalizedPartnerBirthDate = normalizeDateInput(formData.partnerBirthDate, isMobileDateInput);
+        if (!normalizedPartnerBirthDate) {
+          toast({
+            title: language === 'sr' ? 'Neispravan datum' : 'Invalid date',
+            description: language === 'sr'
+              ? 'Unesite datum partnera u formatu dd/mm/yyyy.'
+              : 'Enter the partner date in dd/mm/yyyy format.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       // Build note with partner info if it's a compatibility analysis
       let fullNote = formData.note || '';
       if (isCompatibilityAnalysis) {
@@ -67,7 +146,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
         first_name: formData.firstName,
         last_name: formData.lastName,
-        birth_date: formData.birthDate,
+        birth_date: normalizedBirthDate,
         birth_time: formData.birthTime || null,
         birth_place: `${formData.birthCity}, ${formData.birthCountry}`,
         city: formData.birthCity,
@@ -159,10 +238,16 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
           </Label>
           <Input
             id="birthDate"
-            type="date"
+            type={isMobileDateInput ? 'text' : 'date'}
             required
             value={formData.birthDate}
-            onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+            onChange={(e) => setFormData({
+              ...formData,
+              birthDate: isMobileDateInput ? formatDayFirstDateInput(e.target.value) : e.target.value,
+            })}
+            placeholder={isMobileDateInput ? 'dd/mm/yyyy' : undefined}
+            inputMode={isMobileDateInput ? 'numeric' : undefined}
+            pattern={isMobileDateInput ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
             className="bg-secondary/50 border-border focus:border-primary"
           />
         </div>
@@ -254,10 +339,16 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
               </Label>
               <Input
                 id="partnerBirthDate"
-                type="date"
+                type={isMobileDateInput ? 'text' : 'date'}
                 required
                 value={formData.partnerBirthDate}
-                onChange={(e) => setFormData({ ...formData, partnerBirthDate: e.target.value })}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  partnerBirthDate: isMobileDateInput ? formatDayFirstDateInput(e.target.value) : e.target.value,
+                })}
+                placeholder={isMobileDateInput ? 'dd/mm/yyyy' : undefined}
+                inputMode={isMobileDateInput ? 'numeric' : undefined}
+                pattern={isMobileDateInput ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
                 className="bg-secondary/50 border-border focus:border-primary"
               />
             </div>
