@@ -591,7 +591,8 @@ app.post('/api/compatibility-llm', llmLimiter, async (req, res) => {
   const prompt = `
 You are an astrologer copywriter. Write ONE short paragraph (max 80 words) in ${languageLabel}.
 Respond ONLY in ${languageLabel}.
-about the couple ${sign1} & ${sign2} with compatibility ${compatibility}%.
+About the couple ${sign1} & ${sign2} with compatibility ${compatibility}%.
+Mention 1-2 key traits for each sign and 1 clear reason why they match or complement each other.
 Vary vocabulary each time; make it warm, intriguing, and end with a soft CTA to order the full paid analysis.
 No lists, no headings—just a single paragraph.`;
 
