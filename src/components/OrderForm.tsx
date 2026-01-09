@@ -41,6 +41,8 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
     partnerBirthCity: '',
     partnerBirthCountry: '',
   });
+  const isTimeMissing = !formData.birthTime.trim()
+    || (isCompatibilityAnalysis && !formData.partnerBirthTime.trim());
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -482,7 +484,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         variant="cosmic"
         size="xl"
         className="w-full"
-        disabled={isSubmitting}
+        disabled={isSubmitting || isTimeMissing}
       >
         {isSubmitting ? '...' : t('form.submit')}
       </Button>

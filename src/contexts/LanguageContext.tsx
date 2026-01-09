@@ -465,12 +465,12 @@ export const translations: Translations = {
     ru: 'Дата рождения' 
   },
   'form.birthtime': { 
-    sr: 'Vreme rođenja (opciono)', 
-    en: 'Birth Time (optional)', 
-    fr: 'Heure de naissance (optionnel)', 
-    de: 'Geburtszeit (optional)', 
-    es: 'Hora de nacimiento (opcional)', 
-    ru: 'Время рождения (необязательно)' 
+    sr: 'Vreme rođenja', 
+    en: 'Birth Time', 
+    fr: 'Heure de naissance', 
+    de: 'Geburtszeit', 
+    es: 'Hora de nacimiento', 
+    ru: 'Время рождения' 
   },
   'form.birthplace': { 
     sr: 'Mesto rođenja', 
