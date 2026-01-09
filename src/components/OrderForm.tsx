@@ -282,7 +282,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
 
         <div className="space-y-2">
           <Label htmlFor="birthTime" className="text-foreground">
-            {t('form.birthtime')}
+            {t('form.birthtime')} <span className="text-accent">*</span>
           </Label>
           <Input
             id="birthTime"
@@ -384,7 +384,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
 
             <div className="space-y-2">
               <Label htmlFor="partnerBirthTime" className="text-foreground">
-                {t('form.birthtime')}
+                {t('form.birthtime')} <span className="text-accent">*</span>
               </Label>
               <Input
                 id="partnerBirthTime"
