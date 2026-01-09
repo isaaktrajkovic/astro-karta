@@ -50,6 +50,7 @@ const compatibilityMatrix: { [key: string]: number } = {
 };
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+const llmEnabled = import.meta.env.VITE_COMPATIBILITY_LLM === 'true';
 
 const parseDateString = (dateStr: string): Date | null => {
   // Accept ISO (YYYY-MM-DD) or legacy MM/DD/YYYY style inputs
@@ -127,6 +128,9 @@ const CompatibilityCalculator = () => {
   const [isLoadingDescription, setIsLoadingDescription] = useState(false);
 
   const fetchLlmDescription = async (sign1: string, sign2: string, compatibility: number) => {
+    if (!llmEnabled) {
+      return null;
+    }
     setIsLoadingDescription(true);
     try {
       const response = await fetch(`${apiBase}/api/compatibility-llm`, {

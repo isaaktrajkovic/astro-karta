@@ -578,8 +578,19 @@ app.post('/api/compatibility-llm', llmLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing sign1/sign2/compatibility' });
   }
 
+  const languageMap = {
+    sr: 'Serbian (Latin script)',
+    en: 'English',
+    fr: 'French',
+    de: 'German',
+    es: 'Spanish',
+    ru: 'Russian',
+  };
+  const languageLabel = languageMap[language] || 'Serbian (Latin script)';
+
   const prompt = `
-You are an astrologer copywriter. Write ONE short paragraph (max 80 words) in ${language}
+You are an astrologer copywriter. Write ONE short paragraph (max 80 words) in ${languageLabel}.
+Respond ONLY in ${languageLabel}.
 about the couple ${sign1} & ${sign2} with compatibility ${compatibility}%.
 Vary vocabulary each time; make it warm, intriguing, and end with a soft CTA to order the full paid analysis.
 No lists, no headings—just a single paragraph.`;
@@ -590,7 +601,7 @@ No lists, no headings—just a single paragraph.`;
       temperature: 0.95,
       max_tokens: 150,
       messages: [
-        { role: 'system', content: 'Stay concise, 1 paragraph, persuasive but authentic.' },
+        { role: 'system', content: `Stay concise, 1 paragraph, persuasive but authentic. Use ${languageLabel} only.` },
         { role: 'user', content: prompt },
       ],
     });
