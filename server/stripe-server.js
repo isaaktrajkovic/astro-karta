@@ -236,16 +236,57 @@ const sendOrderNotifications = async ({
     to: email,
     subject: `Vaša narudžbina je primljena - ${productName}`,
     html: `
-      <h1>Hvala vam na narudžbini, ${customerName}!</h1>
-      <p>Vaša narudžbina za <strong>${productName}</strong> je uspešno primljena.</p>
-      <h2>Detalji:</h2>
-      <ul>
-        <li><strong>Datum rođenja:</strong> ${birthDate}</li>
-        <li><strong>Vreme rođenja:</strong> ${birthTime || 'Nije navedeno'}</li>
-        <li><strong>Mesto rođenja:</strong> ${birthPlace}</li>
-      </ul>
-      <p>Vaš astrološki izveštaj ćete dobiti na ovaj email u najkraćem mogućem roku.</p>
-      <p>Srdačan pozdrav,<br>Astro Portal Tim</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0b0a13; padding:24px; font-family:Arial, sans-serif; color:#e8e4ff;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px; background-color:#17122b; border:1px solid #2a2248; border-radius:16px; overflow:hidden;">
+              <tr>
+                <td style="background:linear-gradient(135deg,#7c3aed 0%,#db2777 100%); padding:24px 28px; color:#fff;">
+                  <h1 style="margin:0 0 6px; font-size:24px; line-height:1.3;">Hvala vam na narudžbini, ${customerName}!</h1>
+                  <p style="margin:0; font-size:14px; opacity:.95;">Vaša narudžbina za <strong>${productName}</strong> je uspešno primljena.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 28px;">
+                  <h2 style="margin:0 0 12px; font-size:16px; color:#c9b8ff; text-transform:uppercase; letter-spacing:.08em;">Detalji</h2>
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
+                    <tr>
+                      <td style="padding:8px 0; color:#a59ac7;">Datum rođenja</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#a59ac7;">Vreme rođenja</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthTime || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#a59ac7;">Mesto rođenja</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthPlace}</td>
+                    </tr>
+                    ${
+                      note
+                        ? `
+                    <tr>
+                      <td style="padding:8px 0; color:#a59ac7; vertical-align:top;">Napomena</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff; white-space:pre-wrap;">${note}</td>
+                    </tr>`
+                        : ''
+                    }
+                  </table>
+                  <p style="margin:20px 0 0; font-size:14px; color:#d7cff5;">
+                    Vaš astrološki izveštaj ćete dobiti na ovaj email u najkraćem mogućem roku.
+                  </p>
+                  <p style="margin:16px 0 0; font-size:14px; color:#c9b8ff;">Srdačan pozdrav,<br>Astro Portal Tim</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:14px 28px; background-color:#120f22; color:#8d82b8; font-size:12px; text-align:center;">
+                  Ova poruka je automatski poslata. Ako imate pitanja, odgovorite na ovaj email.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     `,
   });
 };
