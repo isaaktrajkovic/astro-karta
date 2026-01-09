@@ -126,6 +126,32 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
       }
 
       // Build note with partner info if it's a compatibility analysis
+      const normalizedBirthTime = formData.birthTime.trim();
+      if (!normalizedBirthTime) {
+        toast({
+          title: language === 'sr' ? 'Neispravno vreme' : 'Invalid time',
+          description: language === 'sr'
+            ? 'Unesite vreme rođenja.'
+            : 'Please enter the birth time.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (isCompatibilityAnalysis) {
+        const normalizedPartnerBirthTime = formData.partnerBirthTime.trim();
+        if (!normalizedPartnerBirthTime) {
+          toast({
+            title: language === 'sr' ? 'Neispravno vreme' : 'Invalid time',
+            description: language === 'sr'
+              ? 'Unesite vreme rođenja partnera.'
+              : 'Please enter the partner birth time.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       let fullNote = formData.note || '';
       if (isCompatibilityAnalysis) {
         const partnerInfo = `
@@ -133,7 +159,7 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
 ${t('form.firstName')}: ${formData.partnerFirstName}
 ${t('form.lastName')}: ${formData.partnerLastName}
 ${t('form.birthdate')}: ${formData.partnerBirthDate}
-${t('form.birthtime')}: ${formData.partnerBirthTime || '-'}
+${t('form.birthtime')}: ${formData.partnerBirthTime}
 ${t('form.birthCity')}: ${formData.partnerBirthCity}
 ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
 ---`;
@@ -147,7 +173,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         first_name: formData.firstName,
         last_name: formData.lastName,
         birth_date: normalizedBirthDate,
-        birth_time: formData.birthTime || null,
+        birth_time: normalizedBirthTime,
         birth_place: `${formData.birthCity}, ${formData.birthCountry}`,
         city: formData.birthCity,
         country: formData.birthCountry,
@@ -259,6 +285,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
           <Input
             id="birthTime"
             type="time"
+            required
             value={formData.birthTime}
             onChange={(e) => setFormData({ ...formData, birthTime: e.target.value })}
             className="bg-secondary/50 border-border focus:border-primary"
@@ -360,6 +387,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
               <Input
                 id="partnerBirthTime"
                 type="time"
+                required
                 value={formData.partnerBirthTime}
                 onChange={(e) => setFormData({ ...formData, partnerBirthTime: e.target.value })}
                 className="bg-secondary/50 border-border focus:border-primary"

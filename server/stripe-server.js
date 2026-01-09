@@ -403,6 +403,8 @@ app.post('/api/orders', async (req, res) => {
     consultation_description,
   } = req.body || {};
 
+  const normalizedBirthTime = String(birth_time || '').trim();
+
   if (
     !product_id ||
     !product_name ||
@@ -410,6 +412,7 @@ app.post('/api/orders', async (req, res) => {
     !first_name ||
     !last_name ||
     !birth_date ||
+    !normalizedBirthTime ||
     !birth_place ||
     !city ||
     !country ||
@@ -443,7 +446,7 @@ app.post('/api/orders', async (req, res) => {
         first_name,
         last_name,
         birth_date,
-        birth_time || null,
+        normalizedBirthTime,
         birth_place,
         city,
         country,
@@ -459,7 +462,7 @@ app.post('/api/orders', async (req, res) => {
       productName: product_name,
       birthDate: birth_date,
       birthPlace: birth_place,
-      birthTime: birth_time,
+      birthTime: normalizedBirthTime,
       note,
     });
 
