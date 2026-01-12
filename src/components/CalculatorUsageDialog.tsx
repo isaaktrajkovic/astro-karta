@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { sr } from 'date-fns/locale';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Calendar as CalendarIcon } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -17,6 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
   Select,
@@ -26,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getUsage } from '@/lib/api';
+import type { DateRange } from 'react-day-picker';
 
 interface DailyUsage {
   date: string;
@@ -37,13 +41,20 @@ interface CalculatorUsageDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type RangeFilter = 'week' | 'month' | 'year';
+type RangeFilter = 'week' | 'month' | 'year' | 'custom';
 
 export const CalculatorUsageDialog = ({ open, onOpenChange }: CalculatorUsageDialogProps) => {
   const { language } = useLanguage();
   const [dailyUsage, setDailyUsage] = useState<DailyUsage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [range, setRange] = useState<RangeFilter>('month');
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(start.getDate() - 6);
+    return { from: start, to: now };
+  });
+  const locale = language === 'sr' ? sr : undefined;
 
   const fetchDailyUsage = async () => {
     setIsLoading(true);
@@ -77,32 +88,46 @@ export const CalculatorUsageDialog = ({ open, onOpenChange }: CalculatorUsageDia
   }, [open]);
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return format(date, 'EEEE, d. MMMM yyyy', { locale: language === 'sr' ? sr : undefined });
+    const date = new Date(`${dateStr}T00:00:00`);
+    return format(date, 'EEEE, d. MMMM yyyy', { locale });
   };
 
   const chartData = useMemo(() => {
     const now = new Date();
-    const start = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
 
-    if (range === 'week') {
-      start.setDate(now.getDate() - 6);
+    if (range === 'custom' && customRange?.from) {
+      start.setTime(customRange.from.getTime());
+      end.setTime((customRange.to ?? customRange.from).getTime());
+    } else if (range === 'week') {
+      start.setDate(start.getDate() - 6);
     } else if (range === 'month') {
-      start.setMonth(now.getMonth() - 1);
+      start.setMonth(start.getMonth() - 1);
     } else {
-      start.setFullYear(now.getFullYear() - 1);
+      start.setFullYear(start.getFullYear() - 1);
     }
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
     const filtered = dailyUsage
       .filter((day) => {
-        const d = new Date(day.date);
-        return d >= start && d <= now;
+        const d = new Date(`${day.date}T00:00:00`);
+        return d >= start && d <= end;
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(`${a.date}T00:00:00`).getTime() - new Date(`${b.date}T00:00:00`).getTime());
 
     // Ensure there is at least one point for the chart
-    return filtered.length > 0 ? filtered : [{ date: format(now, 'yyyy-MM-dd'), count: 0 }];
-  }, [dailyUsage, range]);
+    return filtered.length > 0 ? filtered : [{ date: format(end, 'yyyy-MM-dd'), count: 0 }];
+  }, [dailyUsage, range, customRange]);
+
+  const formatShortDate = (date: Date) => format(date, 'd MMM yyyy', { locale });
+  const customRangeLabel = customRange?.from
+    ? customRange.to
+      ? `${formatShortDate(customRange.from)} - ${formatShortDate(customRange.to)}`
+      : formatShortDate(customRange.from)
+    : (language === 'sr' ? 'Izaberite period' : 'Select a range');
 
   const totalUsage = dailyUsage.reduce((sum, day) => sum + day.count, 0);
   const totalInRange = chartData.reduce((sum, day) => sum + day.count, 0);
@@ -136,16 +161,44 @@ export const CalculatorUsageDialog = ({ open, onOpenChange }: CalculatorUsageDia
                 {language === 'sr' ? 'Prikaz' : 'Range'}
               </span>
               <Select value={range} onValueChange={(v) => setRange(v as RangeFilter)}>
-                <SelectTrigger className="w-[140px] bg-background">
+                <SelectTrigger className="w-[220px] bg-background">
                   <SelectValue placeholder={language === 'sr' ? 'Izaberi' : 'Select'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="week">{language === 'sr' ? 'Nedelja' : 'Week'}</SelectItem>
-                  <SelectItem value="month">{language === 'sr' ? 'Mesec' : 'Month'}</SelectItem>
-                  <SelectItem value="year">{language === 'sr' ? 'Godina' : 'Year'}</SelectItem>
+                  <SelectItem value="week">{language === 'sr' ? 'Poslednjih 7 dana' : 'Last 7 days'}</SelectItem>
+                  <SelectItem value="month">{language === 'sr' ? 'Poslednjih mesec dana' : 'Last month'}</SelectItem>
+                  <SelectItem value="year">{language === 'sr' ? 'Poslednja godina' : 'Last year'}</SelectItem>
+                  <SelectItem value="custom">{language === 'sr' ? 'Prilagođeni period' : 'Custom range'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {range === 'custom' && (
+              <div className="mt-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${
+                        customRange?.from ? 'text-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                      {customRangeLabel}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={setCustomRange}
+                      numberOfMonths={2}
+                      defaultMonth={customRange?.from}
+                      disabled={{ after: new Date() }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         </div>
 
@@ -160,7 +213,7 @@ export const CalculatorUsageDialog = ({ open, onOpenChange }: CalculatorUsageDia
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={(value) => format(new Date(value), 'd MMM')}
+                  tickFormatter={(value) => format(new Date(`${value}T00:00:00`), 'd MMM')}
                   stroke="hsl(var(--muted-foreground))"
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                 />
