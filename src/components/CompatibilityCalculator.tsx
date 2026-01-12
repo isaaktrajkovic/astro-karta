@@ -280,16 +280,39 @@ const CompatibilityCalculator = () => {
         {/* Calculate Button */}
         <div className="text-center mt-8">
           <Button
-        variant="cosmic"
-        size="xl"
-        onClick={handleCalculate}
-        disabled={!canCalculate || isLoadingDescription}
-        className="min-w-[200px]"
-      >
-        <Heart className="mr-2 h-5 w-5" />
-        {isLoadingDescription ? '...' : t('compatibility.calculate')}
-      </Button>
+            variant="cosmic"
+            size="xl"
+            onClick={handleCalculate}
+            disabled={!canCalculate || isLoadingDescription}
+            className="min-w-[200px]"
+          >
+            <Heart className="mr-2 h-5 w-5" />
+            {isLoadingDescription ? '...' : t('compatibility.calculate')}
+          </Button>
         </div>
+
+        {isLoadingDescription && (
+          <div
+            className="mt-6 flex flex-col items-center gap-3 text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="relative h-20 w-20">
+              <div className="absolute inset-0 rounded-full stars-bg opacity-70" />
+              <div className="absolute inset-2 rounded-full border border-primary/20 orbit-slow">
+                <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]" />
+              </div>
+              <div className="absolute inset-5 rounded-full border border-accent/40 orbit-fast">
+                <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-accent shadow-[0_0_10px_hsl(var(--accent)/0.6)]" />
+              </div>
+              <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/80 animate-pulse" />
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-foreground">{t('compatibility.loadingTitle')}</div>
+              <div className="text-xs text-muted-foreground">{t('compatibility.loadingSubtitle')}</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Result Dialog */}

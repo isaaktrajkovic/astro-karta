@@ -528,6 +528,46 @@ export const translations: Translations = {
     es: 'Enviar pedido', 
     ru: 'Отправить заказ' 
   },
+  'form.previewTitle': {
+    sr: 'Pregled porudžbine',
+    en: 'Order Preview',
+    fr: 'Aperçu de la commande',
+    de: 'Bestellvorschau',
+    es: 'Vista previa del pedido',
+    ru: 'Предпросмотр заказа'
+  },
+  'form.previewHint': {
+    sr: 'Proverite unete podatke pre slanja.',
+    en: 'Check your details before submitting.',
+    fr: 'Vérifiez vos informations avant l\'envoi.',
+    de: 'Bitte prüfen Sie Ihre Angaben vor dem Absenden.',
+    es: 'Revisa tus datos antes de enviar.',
+    ru: 'Проверьте данные перед отправкой.'
+  },
+  'form.preview': {
+    sr: 'Pregledaj porudžbinu',
+    en: 'Review order',
+    fr: 'Aperçu de la commande',
+    de: 'Bestellung prüfen',
+    es: 'Revisar pedido',
+    ru: 'Просмотреть заказ'
+  },
+  'form.edit': {
+    sr: 'Izmeni',
+    en: 'Edit',
+    fr: 'Modifier',
+    de: 'Bearbeiten',
+    es: 'Editar',
+    ru: 'Изменить'
+  },
+  'form.confirm': {
+    sr: 'Poruči',
+    en: 'Place order',
+    fr: 'Passer la commande',
+    de: 'Bestellung aufgeben',
+    es: 'Realizar pedido',
+    ru: 'Оформить заказ'
+  },
   'form.required': { 
     sr: 'Obavezna polja označena su sa *', 
     en: 'Required fields are marked with *', 
@@ -731,6 +771,22 @@ export const translations: Translations = {
     de: 'Kompatibilität berechnen',
     es: 'Calcular compatibilidad',
     ru: 'Рассчитать совместимость'
+  },
+  'compatibility.loadingTitle': {
+    sr: 'Zvezde se poravnavaju...',
+    en: 'Aligning the stars...',
+    fr: 'Alignement des étoiles...',
+    de: 'Die Sterne richten sich aus...',
+    es: 'Alineando las estrellas...',
+    ru: 'Звезды выстраиваются...'
+  },
+  'compatibility.loadingSubtitle': {
+    sr: 'Pripremamo vaš astro uvid.',
+    en: 'Preparing your cosmic insight.',
+    fr: 'Préparation de votre lecture cosmique.',
+    de: 'Wir bereiten Ihre kosmische Deutung vor.',
+    es: 'Preparando tu lectura cósmica.',
+    ru: 'Готовим ваш космический ответ.'
   },
   'compatibility.result': {
     sr: 'Vaša kompatibilnost',

@@ -352,6 +352,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
               type="button"
               variant="outline"
               className="w-full"
+              disabled={isSubmitting}
               onClick={() => {
                 setIsPreview(false);
                 setPreviewData(null);
