@@ -11,6 +11,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 4242;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const frontendUrlsEnv = process.env.FRONTEND_URLS || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const authSecret = process.env.AUTH_TOKEN_SECRET || '';
 const adminEmail = process.env.ADMIN_EMAIL || '';
@@ -32,6 +33,37 @@ const horoscopeDurationDays = Number(process.env.HOROSCOPE_DURATION_DAYS || 30);
 const horoscopeSchedulerIntervalMs = Number(process.env.HOROSCOPE_SCHEDULER_INTERVAL_MS || 5 * 60 * 1000);
 const horoscopeSchedulerEnabled = process.env.HOROSCOPE_SCHEDULER_ENABLED !== 'false';
 const horoscopeBatchSize = Number(process.env.HOROSCOPE_BATCH_SIZE || 200);
+
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
+
+const buildAllowedOrigins = () => {
+  const origins = new Set();
+  const addOrigin = (value) => {
+    const normalized = normalizeOrigin(value);
+    if (normalized) origins.add(normalized);
+  };
+
+  addOrigin(frontendUrl);
+  frontendUrlsEnv
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach(addOrigin);
+
+  const frontendNormalized = normalizeOrigin(frontendUrl);
+  if (frontendNormalized.includes('://www.')) {
+    addOrigin(frontendNormalized.replace('://www.', '://'));
+  } else if (frontendNormalized.includes('://')) {
+    addOrigin(frontendNormalized.replace('://', '://www.'));
+  }
+
+  addOrigin('http://localhost:5173');
+  addOrigin('http://127.0.0.1:5173');
+
+  return origins;
+};
+
+const allowedOrigins = buildAllowedOrigins();
 
 const openai =
   openaiApiKey.trim() !== ''
@@ -1143,7 +1175,19 @@ const startHoroscopeScheduler = () => {
 };
 
 // Other routes can use JSON parsing
-app.use(cors({ origin: frontendUrl, allowedHeaders: ['Content-Type', 'Authorization'] }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalized)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json());
 
 // Simple rate limit for LLM endpoint (per IP)
