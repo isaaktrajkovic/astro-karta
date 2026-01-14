@@ -45,6 +45,7 @@ interface CompatibilityResultDialogProps {
   compatibility: number;
   llmDescription?: string | null;
   isLoadingDescription?: boolean;
+  llmResolved?: boolean;
   useLlm?: boolean;
 }
 
@@ -56,6 +57,7 @@ const CompatibilityResultDialog = ({
   compatibility,
   llmDescription,
   isLoadingDescription = false,
+  llmResolved = true,
   useLlm = false,
 }: CompatibilityResultDialogProps) => {
   const { t, language } = useLanguage();
@@ -102,11 +104,8 @@ const CompatibilityResultDialog = ({
   };
 
   const getDescription = () => {
-    if (llmDescription) {
+    if (llmDescription && llmDescription.trim()) {
       return llmDescription;
-    }
-    if (useLlm) {
-      return null;
     }
     return getCompatibilityDescription(sign1.name, sign2.name, compatibility, language);
   };
@@ -208,7 +207,7 @@ const CompatibilityResultDialog = ({
             </div>
 
             {/* Description */}
-            {useLlm && isLoadingDescription ? (
+            {useLlm && !llmResolved ? (
               <div className="mb-6 flex flex-col items-center gap-3 text-sm text-muted-foreground">
                 <div className="relative h-16 w-16">
                   <div className="absolute inset-0 rounded-full stars-bg opacity-70" />

@@ -2098,28 +2098,28 @@ export const getCompatibilityDescription = (
   // Fallback descriptions based on level
   const fallbackDescriptions: { [level in CompatibilityLevel]: DescriptionSet } = {
     high: {
-      sr: 'Vaša veza ima odličan potencijal! Uživajte u harmoniji i nastavite da gradite na ovoj vezi.',
-      en: 'Your relationship has excellent potential! Enjoy the harmony and continue building on this connection.',
-      fr: 'Votre relation a un excellent potentiel! Profitez de l\'harmonie.',
-      de: 'Ihre Beziehung hat ausgezeichnetes Potenzial! Genießen Sie die Harmonie.',
-      es: '¡Su relación tiene un excelente potencial! Disfruten de la armonía.',
-      ru: 'У ваших отношений отличный потенциал! Наслаждайтесь гармонией.'
+      sr: 'Vaša veza ima odličan potencijal! Uživajte u harmoniji i nastavite da gradite na ovoj vezi. Negujte iskren razgovor i zajedničke planove, jer tu najviše blistate.',
+      en: 'Your relationship has excellent potential! Enjoy the harmony and continue building on this connection. Keep communication open and celebrate shared goals to deepen the bond.',
+      fr: 'Votre relation a un excellent potentiel! Profitez de l\'harmonie. En cultivant la communication et des projets communs, le lien se renforcera.',
+      de: 'Ihre Beziehung hat ausgezeichnetes Potenzial! Genießen Sie die Harmonie. Mit offener Kommunikation und gemeinsamen Zielen wächst die Verbindung weiter.',
+      es: '¡Su relación tiene un excelente potencial! Disfruten de la armonía. Con comunicación abierta y metas compartidas, el vínculo se fortalece.',
+      ru: 'У ваших отношений отличный потенциал! Наслаждайтесь гармонией. Открытый диалог и общие планы сделают связь еще крепче.'
     },
     medium: {
-      sr: 'Vaši znakovi imaju jedinstvenu dinamiku. Sa trudom i razumevanjem možete stvoriti duboku vezu.',
-      en: 'Your signs have a unique dynamic. With effort and understanding, you can create a deep connection.',
-      fr: 'Vos signes ont une dynamique unique. Avec effort et compréhension, vous pouvez créer une connexion profonde.',
-      de: 'Ihre Zeichen haben eine einzigartige Dynamik. Mit Mühe und Verständnis können Sie eine tiefe Verbindung schaffen.',
-      es: 'Sus signos tienen una dinámica única. Con esfuerzo y comprensión, pueden crear una conexión profunda.',
-      ru: 'У ваших знаков уникальная динамика. С усилием и пониманием вы можете создать глубокую связь.'
+      sr: 'Vaši znakovi imaju jedinstvenu dinamiku. Sa trudom i razumevanjem možete stvoriti duboku vezu. Fokusirajte se na kompromis i poštovanje različitih potreba.',
+      en: 'Your signs have a unique dynamic. With effort and understanding, you can create a deep connection. Focus on compromise and respecting each other\'s needs.',
+      fr: 'Vos signes ont une dynamique unique. Avec effort et compréhension, vous pouvez créer une connexion profonde. Misez sur le compromis et le respect des besoins de l\'autre.',
+      de: 'Ihre Zeichen haben eine einzigartige Dynamik. Mit Mühe und Verständnis können Sie eine tiefe Verbindung schaffen. Setzen Sie auf Kompromisse und Respekt für unterschiedliche Bedürfnisse.',
+      es: 'Sus signos tienen una dinámica única. Con esfuerzo y comprensión, pueden crear una conexión profunda. Apuesten por el compromiso y el respeto de las necesidades del otro.',
+      ru: 'У ваших знаков уникальная динамика. С усилием и пониманием вы можете создать глубокую связь. Делайте ставку на компромисс и уважение потребностей друг друга.'
     },
     low: {
-      sr: 'Ova veza zahteva ozbiljan rad i kompromis. Fokusirajte se na komunikaciju i razumevanje razlika.',
-      en: 'This relationship requires serious work and compromise. Focus on communication and understanding differences.',
-      fr: 'Cette relation nécessite un travail sérieux et des compromis. Concentrez-vous sur la communication.',
-      de: 'Diese Beziehung erfordert ernsthafte Arbeit und Kompromisse. Konzentrieren Sie sich auf Kommunikation.',
-      es: 'Esta relación requiere trabajo serio y compromiso. Concéntrense en la comunicación.',
-      ru: 'Эти отношения требуют серьезной работы и компромиссов. Сосредоточьтесь на общении.'
+      sr: 'Ova veza zahteva ozbiljan rad i kompromis. Fokusirajte se na komunikaciju i razumevanje razlika. Strpljenje i jasne granice mogu pomoći da se odnos stabilizuje.',
+      en: 'This relationship requires serious work and compromise. Focus on communication and understanding differences. Patience and clear boundaries can help stabilize the connection.',
+      fr: 'Cette relation nécessite un travail sérieux et des compromis. Concentrez-vous sur la communication et la compréhension des différences. La patience et des limites claires peuvent stabiliser le lien.',
+      de: 'Diese Beziehung erfordert ernsthafte Arbeit und Kompromisse. Konzentrieren Sie sich auf Kommunikation und das Verständnis von Unterschieden. Geduld und klare Grenzen können Stabilität bringen.',
+      es: 'Esta relación requiere trabajo serio y compromiso. Concéntrense en la comunicación y en comprender las diferencias. La paciencia y los límites claros pueden estabilizar el vínculo.',
+      ru: 'Эти отношения требуют серьезной работы и компромиссов. Сосредоточьтесь на общении и понимании различий. Терпение и четкие границы помогут стабилизировать связь.'
     }
   };
 

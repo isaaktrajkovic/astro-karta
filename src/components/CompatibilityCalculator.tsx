@@ -138,6 +138,7 @@ const CompatibilityCalculator = () => {
   } | null>(null);
   const maxDate = new Date().toISOString().split('T')[0];
   const [isLoadingDescription, setIsLoadingDescription] = useState(false);
+  const [llmResolved, setLlmResolved] = useState(true);
   const [isMobileDateInput, setIsMobileDateInput] = useState(false);
   const llmRequestIdRef = useRef(0);
 
@@ -194,6 +195,7 @@ const CompatibilityCalculator = () => {
 
     setResult({ sign1, sign2, compatibility, llmDescription: null });
     setShowResult(true);
+    setLlmResolved(!llmEnabled);
 
     // Track calculator usage without blocking the UI
     trackUsage({
@@ -208,6 +210,7 @@ const CompatibilityCalculator = () => {
       const requestId = llmRequestIdRef.current + 1;
       llmRequestIdRef.current = requestId;
       setIsLoadingDescription(true);
+      setLlmResolved(false);
 
       fetchLlmDescription(sign1.name, sign2.name, compatibility)
         .then((llmDescription) => {
@@ -219,10 +222,12 @@ const CompatibilityCalculator = () => {
         .finally(() => {
           if (llmRequestIdRef.current === requestId) {
             setIsLoadingDescription(false);
+            setLlmResolved(true);
           }
         });
     } else {
       setIsLoadingDescription(false);
+      setLlmResolved(true);
     }
   };
 
@@ -340,6 +345,7 @@ const CompatibilityCalculator = () => {
           compatibility={result.compatibility}
           llmDescription={result.llmDescription}
           isLoadingDescription={isLoadingDescription}
+          llmResolved={llmResolved}
           useLlm={llmEnabled}
         />
       )}
