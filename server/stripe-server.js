@@ -1354,6 +1354,40 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
   }
 });
 
+app.post('/api/orders/bulk-delete', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Missing order ids' });
+  }
+
+  const normalizedIds = Array.from(
+    new Set(
+      ids
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )
+  );
+
+  if (!normalizedIds.length) {
+    return res.status(400).json({ error: 'Invalid order ids' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM orders WHERE id = ANY($1::int[])',
+      [normalizedIds]
+    );
+    return res.json({ success: true, deleted: rowCount || 0 });
+  } catch (error) {
+    console.error('Failed to delete orders:', error);
+    return res.status(500).json({ error: 'Failed to delete orders' });
+  }
+});
+
 app.patch('/api/orders/:id', requireAuth, async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: 'Database not configured' });

@@ -169,6 +169,13 @@ export const updateOrderStatus = (orderId: number, status: string) =>
     body: JSON.stringify({ status }),
   });
 
+export const deleteOrders = (orderIds: number[]) =>
+  request<{ success: true; deleted: number }>('/api/orders/bulk-delete', {
+    method: 'POST',
+    auth: true,
+    body: JSON.stringify({ ids: orderIds }),
+  });
+
 export const createOrder = (payload: CreateOrderPayload) =>
   request<{ success: true; orderId: number }>('/api/orders', {
     method: 'POST',

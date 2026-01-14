@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
-import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus } from '@/lib/api';
+import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus, deleteOrders } from '@/lib/api';
 import {
   Select,
   SelectContent,
@@ -240,6 +240,40 @@ const Dashboard = () => {
     });
   };
 
+  const deleteSelectedOrders = async () => {
+    const selectedIds = Array.from(selectedOrders);
+    if (selectedIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      language === 'sr'
+        ? `Obrisati ${selectedIds.length} izabranih narudžbina? Ovo se ne može vratiti.`
+        : `Delete ${selectedIds.length} selected orders? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const { deleted } = await deleteOrders(selectedIds);
+      const selectedIdSet = new Set(selectedIds);
+      setOrders((prev) => prev.filter((order) => !selectedIdSet.has(order.id)));
+      setSelectedOrders(new Set());
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr'
+          ? `Obrisano ${deleted} narudžbina`
+          : `Deleted ${deleted} orders`,
+      });
+    } catch (error) {
+      console.error('Error deleting orders:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće obrisati narudžbine'
+          : 'Could not delete orders',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusBadgeStyles = (status: string) => {
     const statusStyles: Record<string, string> = {
       pending: 'bg-yellow-500/20 text-yellow-400',
@@ -393,17 +427,29 @@ const Dashboard = () => {
 
             {/* Export Button */}
             <div className="flex flex-col gap-1 ml-auto">
-              <label className="text-xs text-muted-foreground invisible">Export</label>
-              <Button 
-                onClick={exportToExcel} 
-                variant="outline" 
-                size="sm"
-                disabled={selectedOrders.size === 0}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {language === 'sr' ? 'Izvezi Excel' : 'Export Excel'}
-                {selectedOrders.size > 0 && ` (${selectedOrders.size})`}
-              </Button>
+              <label className="text-xs text-muted-foreground invisible">Actions</label>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={exportToExcel} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={selectedOrders.size === 0}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {language === 'sr' ? 'Izvezi Excel' : 'Export Excel'}
+                  {selectedOrders.size > 0 && ` (${selectedOrders.size})`}
+                </Button>
+                <Button
+                  onClick={deleteSelectedOrders}
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedOrders.size === 0}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {language === 'sr' ? 'Obriši' : 'Delete'}
+                  {selectedOrders.size > 0 && ` (${selectedOrders.size})`}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
