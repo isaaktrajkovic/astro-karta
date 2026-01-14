@@ -589,6 +589,7 @@ const getHoroscopeEmailCopy = (language) => {
   const copy = {
     sr: {
       subject: 'Vaš dnevni horoskop',
+      immediateGreeting: 'Zdravo',
       greeting: 'Dobro jutro',
       intro: 'Vaš personalizovani horoskop',
       outro: 'Želimo vam miran i uspešan dan.',
@@ -596,6 +597,7 @@ const getHoroscopeEmailCopy = (language) => {
     },
     en: {
       subject: 'Your daily horoscope',
+      immediateGreeting: 'Hello',
       greeting: 'Good morning',
       intro: 'Your personalized horoscope',
       outro: 'Wishing you a calm and successful day.',
@@ -802,8 +804,10 @@ const sendDailyHoroscopeEmail = async ({
   sections,
   unsubscribeUrl,
   language,
+  isImmediate = false,
 }) => {
   const copy = getHoroscopeEmailCopy(language);
+  const greeting = isImmediate && copy.immediateGreeting ? copy.immediateGreeting : copy.greeting;
   const greetingName = firstName ? ` ${firstName}` : '';
   const workLabel = sections.labels?.work || 'Posao';
   const healthLabel = sections.labels?.health || 'Zdravlje';
@@ -830,7 +834,7 @@ const sendDailyHoroscopeEmail = async ({
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #e8e4ff; background-color: #0b0a13;">
-      <h1 style="font-size: 22px; margin: 0 0 8px;">${escapeHtml(copy.greeting)}${escapeHtml(greetingName)}</h1>
+      <h1 style="font-size: 22px; margin: 0 0 8px;">${escapeHtml(greeting)}${escapeHtml(greetingName)}</h1>
       <p style="margin: 0 0 16px; color: #b7b0d9;">${escapeHtml(copy.intro)} · ${escapeHtml(dateLabel)}</p>
       <div style="background: #171429; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
         ${renderSection(workLabel, sections.work)}
@@ -890,7 +894,7 @@ const logHoroscopeDelivery = async ({
 };
 
 const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), options = {}) => {
-  const { sendAt: overrideSendAt, forceNextDay = false } = options || {};
+  const { sendAt: overrideSendAt, forceNextDay = false, isImmediate = false } = options || {};
   const timezone = normalizeTimezone(subscription.timezone);
   const language = getSupportedLanguage(subscription.language);
   const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
@@ -964,6 +968,7 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), opt
     sections: horoscope,
     unsubscribeUrl,
     language,
+    isImmediate,
   });
 
   await logHoroscopeDelivery({
@@ -1385,6 +1390,7 @@ app.post('/api/orders', async (req, res) => {
               deliverSubscriptionHoroscope(subscription, new Map(), {
                 sendAt,
                 forceNextDay: true,
+                isImmediate: true,
               }).catch((sendError) => {
                 console.error('Failed to send initial horoscope:', sendError);
               });
@@ -1734,6 +1740,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
       const sendResult = await deliverSubscriptionHoroscope(subscription, new Map(), {
         sendAt: new Date(),
         forceNextDay: true,
+        isImmediate: true,
       });
       return res.json({
         success: true,
