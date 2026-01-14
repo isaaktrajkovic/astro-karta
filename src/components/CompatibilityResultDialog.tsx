@@ -44,6 +44,8 @@ interface CompatibilityResultDialogProps {
   sign2: { name: string; symbol: string };
   compatibility: number;
   llmDescription?: string | null;
+  isLoadingDescription?: boolean;
+  useLlm?: boolean;
 }
 
 const CompatibilityResultDialog = ({
@@ -53,16 +55,20 @@ const CompatibilityResultDialog = ({
   sign2,
   compatibility,
   llmDescription,
+  isLoadingDescription = false,
+  useLlm = false,
 }: CompatibilityResultDialogProps) => {
   const { t, language } = useLanguage();
   const [showProgress, setShowProgress] = useState(0);
   const [showUpsell, setShowUpsell] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [loadingDots, setLoadingDots] = useState(0);
 
   useEffect(() => {
     if (open) {
       setShowProgress(0);
       setShowUpsell(false);
+      setLoadingDots(0);
       
       // Animate progress bar
       const timer = setTimeout(() => {
@@ -81,6 +87,14 @@ const CompatibilityResultDialog = ({
     }
   }, [open, compatibility]);
 
+  useEffect(() => {
+    if (!open || !isLoadingDescription || !useLlm) return undefined;
+    const interval = setInterval(() => {
+      setLoadingDots((prev) => (prev + 1) % 4);
+    }, 450);
+    return () => clearInterval(interval);
+  }, [open, isLoadingDescription, useLlm]);
+
   const getProgressColor = () => {
     if (compatibility >= 80) return 'bg-green-500';
     if (compatibility >= 60) return 'bg-yellow-500';
@@ -88,7 +102,13 @@ const CompatibilityResultDialog = ({
   };
 
   const getDescription = () => {
-    return llmDescription || getCompatibilityDescription(sign1.name, sign2.name, compatibility, language);
+    if (llmDescription) {
+      return llmDescription;
+    }
+    if (useLlm) {
+      return null;
+    }
+    return getCompatibilityDescription(sign1.name, sign2.name, compatibility, language);
   };
 
   const getShareText = () => {
@@ -188,9 +208,30 @@ const CompatibilityResultDialog = ({
             </div>
 
             {/* Description */}
-            <p className="text-center text-muted-foreground mb-6">
-              {getDescription()}
-            </p>
+            {useLlm && isLoadingDescription ? (
+              <div className="mb-6 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+                <div className="relative h-16 w-16">
+                  <div className="absolute inset-0 rounded-full stars-bg opacity-70" />
+                  <div className="absolute inset-2 rounded-full border border-primary/20 orbit-slow">
+                    <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]" />
+                  </div>
+                  <div className="absolute inset-5 rounded-full border border-accent/40 orbit-fast">
+                    <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-accent shadow-[0_0_10px_hsl(var(--accent)/0.6)]" />
+                  </div>
+                  <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/80 animate-pulse" />
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-foreground">
+                    {t('compatibility.loadingTitle')}{'.'.repeat(loadingDots)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{t('compatibility.loadingSubtitle')}</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground mb-6">
+                {getDescription()}
+              </p>
+            )}
 
             {/* Share buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mb-6">

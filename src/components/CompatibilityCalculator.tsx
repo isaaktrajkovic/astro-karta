@@ -339,6 +339,8 @@ const CompatibilityCalculator = () => {
           sign2={result.sign2}
           compatibility={result.compatibility}
           llmDescription={result.llmDescription}
+          isLoadingDescription={isLoadingDescription}
+          useLlm={llmEnabled}
         />
       )}
     </section>
