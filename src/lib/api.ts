@@ -213,6 +213,12 @@ export const getHoroscopeSubscriptions = () =>
     auth: true,
   });
 
+export const cancelHoroscopeSubscription = (subscriptionId: string) =>
+  request<{ success: true }>(`/api/horoscope/subscriptions/${subscriptionId}/cancel`, {
+    method: 'POST',
+    auth: true,
+  });
+
 export const getHoroscopeDeliveries = (limit = 200) =>
   request<{ deliveries: HoroscopeDeliveryLog[] }>(`/api/horoscope/deliveries?limit=${limit}`, {
     method: 'GET',

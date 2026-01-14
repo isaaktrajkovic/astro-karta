@@ -19,7 +19,7 @@ import {
 
 type Order = ApiOrder;
 
-type StatusFilter = 'all' | 'pending' | 'processing' | 'completed';
+type StatusFilter = 'all' | 'pending' | 'processing' | 'completed' | 'cancelled';
 type TimeFilter = 'all' | 'today' | 'week' | 'month' | 'year';
 type ZodiacSign = 'all' | 'aries' | 'taurus' | 'gemini' | 'cancer' | 'leo' | 'virgo' | 
                   'libra' | 'scorpio' | 'sagittarius' | 'capricorn' | 'aquarius' | 'pisces';
@@ -398,6 +398,7 @@ const Dashboard = () => {
                   <SelectItem value="pending">{language === 'sr' ? 'Na čekanju' : 'Pending'}</SelectItem>
                   <SelectItem value="processing">{language === 'sr' ? 'U obradi' : 'Processing'}</SelectItem>
                   <SelectItem value="completed">{language === 'sr' ? 'Završeno' : 'Completed'}</SelectItem>
+                  <SelectItem value="cancelled">{language === 'sr' ? 'Otkazano' : 'Cancelled'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -656,6 +657,12 @@ const Dashboard = () => {
                               <span className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-red-400" />
                                 {language === 'sr' ? 'Završeno' : 'Completed'}
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="cancelled">
+                              <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+                                {language === 'sr' ? 'Otkazano' : 'Cancelled'}
                               </span>
                             </SelectItem>
                           </SelectContent>

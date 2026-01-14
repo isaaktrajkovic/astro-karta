@@ -1494,6 +1494,33 @@ app.get('/api/horoscope/subscriptions', requireAuth, async (_req, res) => {
   }
 });
 
+app.post('/api/horoscope/subscriptions/:id/cancel', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const subscriptionId = Number(req.params.id);
+  if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
+    return res.status(400).json({ error: 'Invalid subscription id' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE horoscope_subscriptions
+       SET status = 'unsubscribed', next_send_at = NULL, unsubscribed_at = NOW()
+       WHERE id = $1`,
+      [subscriptionId]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to cancel horoscope subscription:', error);
+    return res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+});
+
 app.get('/api/horoscope/deliveries', requireAuth, async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: 'Database not configured' });

@@ -19,6 +19,7 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import {
+  cancelHoroscopeSubscription,
   createTestHoroscopeSubscription,
   getHoroscopeDeliveries,
   getHoroscopeSubscriptions,
@@ -38,6 +39,8 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
   const [isLoading, setIsLoading] = useState(false);
   const [showTestForm, setShowTestForm] = useState(false);
   const [isCreatingTest, setIsCreatingTest] = useState(false);
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [testForm, setTestForm] = useState({
     email: '',
     zodiacSign: 'aries',
@@ -146,6 +149,54 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
     plan === 'premium'
       ? (language === 'sr' ? 'Premium' : 'Premium')
       : (language === 'sr' ? 'Osnovni' : 'Basic');
+
+  const filteredSubscriptions = useMemo(() => {
+    if (subscriptionStatusFilter === 'all') return subscriptions;
+    return subscriptions.filter((subscription) => subscription.status === subscriptionStatusFilter);
+  }, [subscriptions, subscriptionStatusFilter]);
+
+  const handleCancelSubscription = async (subscriptionId: string) => {
+    const confirmed = window.confirm(
+      language === 'sr'
+        ? 'Da li ste sigurni da želite da otkažete pretplatu?'
+        : 'Are you sure you want to cancel this subscription?'
+    );
+    if (!confirmed) return;
+
+    setCancellingId(subscriptionId);
+    try {
+      await cancelHoroscopeSubscription(subscriptionId);
+      setSubscriptions((prev) =>
+        prev.map((subscription) =>
+          subscription.id === subscriptionId
+            ? {
+                ...subscription,
+                status: 'unsubscribed',
+                next_send_at: null,
+                unsubscribed_at: new Date().toISOString(),
+              }
+            : subscription
+        )
+      );
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr'
+          ? 'Pretplata je otkazana.'
+          : 'Subscription cancelled.',
+      });
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće otkazati pretplatu.'
+          : 'Could not cancel subscription.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const handleCreateTestSubscription = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -371,15 +422,31 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
         </div>
 
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-3">
-            {language === 'sr' ? 'Pretplate' : 'Subscriptions'}
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              {language === 'sr' ? 'Pretplate' : 'Subscriptions'}
+            </h3>
+            <Select
+              value={subscriptionStatusFilter}
+              onValueChange={(value) => setSubscriptionStatusFilter(value)}
+            >
+              <SelectTrigger className="h-8 w-[160px] bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{language === 'sr' ? 'Svi statusi' : 'All statuses'}</SelectItem>
+                <SelectItem value="active">{language === 'sr' ? 'Aktivne' : 'Active'}</SelectItem>
+                <SelectItem value="completed">{language === 'sr' ? 'Završene' : 'Completed'}</SelectItem>
+                <SelectItem value="unsubscribed">{language === 'sr' ? 'Odjavljene' : 'Unsubscribed'}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="border border-border rounded-lg overflow-hidden">
             {isLoading ? (
               <div className="p-6 text-sm text-muted-foreground">
                 {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
               </div>
-            ) : subscriptions.length === 0 ? (
+            ) : filteredSubscriptions.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">
                 {language === 'sr' ? 'Nema pretplata' : 'No subscriptions yet'}
               </div>
@@ -395,10 +462,11 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                       <th className="p-3 text-left">{language === 'sr' ? 'Sledeće slanje' : 'Next send'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Poslednje slanje' : 'Last sent'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Poslato' : 'Sent'}</th>
+                      <th className="p-3 text-right">{language === 'sr' ? 'Akcije' : 'Actions'}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {subscriptions.map((subscription) => (
+                    {filteredSubscriptions.map((subscription) => (
                       <tr key={subscription.id} className="border-t border-border">
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -416,6 +484,20 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                         <td className="p-3 text-muted-foreground">{formatDateTime(subscription.next_send_at)}</td>
                         <td className="p-3 text-muted-foreground">{formatDateTime(subscription.last_sent_at)}</td>
                         <td className="p-3 text-muted-foreground">{subscription.send_count}</td>
+                        <td className="p-3 text-right">
+                          {subscription.status === 'active' ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={cancellingId === subscription.id}
+                              onClick={() => handleCancelSubscription(subscription.id)}
+                            >
+                              {language === 'sr' ? 'Otkaži' : 'Cancel'}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
