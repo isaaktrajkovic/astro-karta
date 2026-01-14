@@ -529,6 +529,13 @@ const getNextSendAt = (fromDate, timeZone, sendHour) => {
   return candidate;
 };
 
+const getNextSendAtAfterImmediate = (fromDate, timeZone, sendHour) => {
+  const parts = getTimeZoneParts(fromDate, timeZone);
+  const utcDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + 1, sendHour, 0, 0, 0));
+  const offset = getTimeZoneOffsetMs(utcDate, timeZone);
+  return new Date(utcDate.getTime() + offset);
+};
+
 const getLocalDateKey = (date, timeZone) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -882,13 +889,18 @@ const logHoroscopeDelivery = async ({
   }
 };
 
-const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => {
+const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), options = {}) => {
+  const { sendAt: overrideSendAt, forceNextDay = false } = options || {};
   const timezone = normalizeTimezone(subscription.timezone);
   const language = getSupportedLanguage(subscription.language);
   const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
   const birthTime = normalizeBirthTime(subscription.birth_time);
   const gender = normalizeGender(subscription.gender);
-  const sendAt = subscription.next_send_at ? new Date(subscription.next_send_at) : new Date();
+  const sendAt = overrideSendAt
+    ? new Date(overrideSendAt)
+    : subscription.next_send_at
+      ? new Date(subscription.next_send_at)
+      : new Date();
   const endAt = subscription.end_at ? new Date(subscription.end_at) : null;
   const sendCount = subscription.send_count || 0;
   const now = new Date();
@@ -972,7 +984,9 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => 
   const completed = updatedSendCount >= horoscopeDurationDays;
   const nextSendAt = completed
     ? null
-    : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, horoscopeSendHour);
+    : forceNextDay
+      ? getNextSendAtAfterImmediate(sendAt, timezone, horoscopeSendHour)
+      : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, horoscopeSendHour);
 
   await pool.query(
     `UPDATE horoscope_subscriptions
@@ -998,6 +1012,7 @@ async function createHoroscopeSubscription({
   language,
   timezone,
   plan,
+  sendNow = false,
 }) {
   if (!pool) return;
   const zodiacSign = getZodiacSignFromDateString(birthDate);
@@ -1013,10 +1028,12 @@ async function createHoroscopeSubscription({
   const endAt = new Date(now);
   endAt.setDate(endAt.getDate() + horoscopeDurationDays);
 
-  const nextSendAt = getNextSendAt(now, normalizedTimezone, horoscopeSendHour);
+  const nextSendAt = sendNow
+    ? now
+    : getNextSendAt(now, normalizedTimezone, horoscopeSendHour);
   const unsubscribeToken = crypto.randomBytes(24).toString('hex');
 
-  await pool.query(
+  const { rows } = await pool.query(
     `INSERT INTO horoscope_subscriptions (
       order_id,
       email,
@@ -1033,7 +1050,8 @@ async function createHoroscopeSubscription({
       end_at,
       next_send_at,
       unsubscribe_token
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)
+    RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, next_send_at, end_at, send_count, unsubscribe_token`,
     [
       orderId || null,
       email,
@@ -1051,6 +1069,8 @@ async function createHoroscopeSubscription({
       unsubscribeToken,
     ]
   );
+
+  return rows[0] || null;
 }
 
 let horoscopeDispatchRunning = false;
@@ -1342,7 +1362,7 @@ app.post('/api/orders', async (req, res) => {
     const plan = horoscopeSubscriptionPlans.get(product_id);
     if (plan) {
       try {
-        await createHoroscopeSubscription({
+        const subscription = await createHoroscopeSubscription({
           orderId: rows[0]?.id,
           email,
           firstName: first_name,
@@ -1353,7 +1373,24 @@ app.post('/api/orders', async (req, res) => {
           language,
           timezone,
           plan,
+          sendNow: true,
         });
+
+        if (subscription) {
+          if (!openai || !resendApiKey || !resendFromEmail) {
+            console.warn('Daily horoscope send skipped: OpenAI/Resend not configured.');
+          } else {
+            const sendAt = new Date();
+            setTimeout(() => {
+              deliverSubscriptionHoroscope(subscription, new Map(), {
+                sendAt,
+                forceNextDay: true,
+              }).catch((sendError) => {
+                console.error('Failed to send initial horoscope:', sendError);
+              });
+            }, 0);
+          }
+        }
       } catch (subscriptionError) {
         console.error('Failed to create horoscope subscription:', subscriptionError);
       }
@@ -1694,7 +1731,10 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'Email/OpenAI not configured' });
       }
 
-      const sendResult = await deliverSubscriptionHoroscope(subscription, new Map());
+      const sendResult = await deliverSubscriptionHoroscope(subscription, new Map(), {
+        sendAt: new Date(),
+        forceNextDay: true,
+      });
       return res.json({
         success: true,
         subscription_id: subscription.id,

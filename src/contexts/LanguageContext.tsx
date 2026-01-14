@@ -151,12 +151,12 @@ export const translations: Translations = {
 
   // Product Groups
   'products.monthly': { 
-    sr: 'Mesečni astro-paketi', 
-    en: 'Monthly Astro Packages', 
-    fr: 'Forfaits astro mensuels', 
-    de: 'Monatliche Astro-Pakete', 
-    es: 'Paquetes astro mensuales', 
-    ru: 'Ежемесячные астро-пакеты' 
+    sr: 'Mesečna pretplata za dnevni horoskop', 
+    en: 'Monthly subscription for daily horoscope', 
+    fr: 'Abonnement mensuel au horoscope quotidien', 
+    de: 'Monatsabo für tägliches Horoskop', 
+    es: 'Suscripción mensual al horóscopo diario', 
+    ru: 'Ежемесячная подписка на ежедневный гороскоп' 
   },
   'products.reports': { 
     sr: 'Digitalni astro-izveštaji', 
@@ -199,12 +199,12 @@ export const translations: Translations = {
     ru: 'Заказать' 
   },
   'products.monthly.desc': { 
-    sr: 'Mesečni horoskopi i astrološki vodiči', 
-    en: 'Monthly horoscopes and astrological guides', 
-    fr: 'Horoscopes mensuels et guides astrologiques', 
-    de: 'Monatliche Horoskope und astrologische Führer', 
-    es: 'Horóscopos mensuales y guías astrológicas', 
-    ru: 'Ежемесячные гороскопы и астрологические гиды' 
+    sr: 'Osnovni ili premium dnevni horoskop za Vaš znak', 
+    en: 'Basic or premium daily horoscope for your sign', 
+    fr: 'Horoscope quotidien de base ou premium pour votre signe', 
+    de: 'Basis- oder Premium-Tageshoroskop für Ihr Zeichen', 
+    es: 'Horóscopo diario básico o premium para tu signo', 
+    ru: 'Базовый или премиальный ежедневный гороскоп для вашего знака' 
   },
   'products.reports.desc': { 
     sr: 'Detaljni tematski izveštaji', 
@@ -241,12 +241,12 @@ export const translations: Translations = {
     ru: 'Базовый пакет' 
   },
   'monthly.basic.desc': { 
-    sr: 'Personalizovan mesečni horoskop za jedan znak, dnevni astro alarm i mini-horoskop', 
-    en: 'Personalized monthly horoscope for one sign, daily astro alarm and mini-horoscope', 
-    fr: 'Horoscope mensuel personnalisé pour un signe, alarme astro quotidienne et mini-horoscope', 
-    de: 'Personalisiertes monatliches Horoskop für ein Zeichen, täglicher Astro-Alarm und Mini-Horoskop', 
-    es: 'Horóscopo mensual personalizado para un signo, alarma astro diaria y mini-horóscopo', 
-    ru: 'Персонализированный ежемесячный гороскоп для одного знака, ежедневный астро-будильник и мини-гороскоп' 
+    sr: 'Dnevni horoskop za Vaš znak', 
+    en: 'Daily horoscope for your sign', 
+    fr: 'Horoscope quotidien pour votre signe', 
+    de: 'Tägliches Horoskop für Ihr Zeichen', 
+    es: 'Horóscopo diario para tu signo', 
+    ru: 'Ежедневный гороскоп для вашего знака' 
   },
   'monthly.premium.title': { 
     sr: 'Premium paket', 
@@ -257,12 +257,12 @@ export const translations: Translations = {
     ru: 'Премиум пакет' 
   },
   'monthly.premium.desc': { 
-    sr: 'Horoskop za Sunce, Mesec i Ascendent, radne sveske, vođene meditacije i mesečni rituali', 
-    en: 'Horoscope for Sun, Moon and Ascendant, workbooks, guided meditations and monthly rituals', 
-    fr: 'Horoscope pour le Soleil, la Lune et l\'Ascendant, cahiers d\'exercices, méditations guidées et rituels mensuels', 
-    de: 'Horoskop für Sonne, Mond und Aszendent, Arbeitsbücher, geführte Meditationen und monatliche Rituale', 
-    es: 'Horóscopo para Sol, Luna y Ascendente, cuadernos de trabajo, meditaciones guiadas y rituales mensuales', 
-    ru: 'Гороскоп для Солнца, Луны и Асцендента, рабочие тетради, медитации и ежемесячные ритуалы' 
+    sr: 'Detaljniji dnevni horoskop za Vaš znak', 
+    en: 'More detailed daily horoscope for your sign', 
+    fr: 'Horoscope quotidien plus détaillé pour votre signe', 
+    de: 'Detaillierteres tägliches Horoskop für Ihr Zeichen', 
+    es: 'Horóscopo diario más detallado para tu signo', 
+    ru: 'Более подробный ежедневный гороскоп для вашего знака' 
   },
   'monthly.perMonth': { 
     sr: 'mesečno', 
