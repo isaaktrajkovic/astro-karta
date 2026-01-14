@@ -496,6 +496,14 @@ const normalizeBirthTime = (birthTime) => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+const normalizeGender = (gender) => {
+  const normalized = String(gender || '').trim().toLowerCase();
+  if (normalized === 'male' || normalized === 'female') {
+    return normalized;
+  }
+  return 'unspecified';
+};
+
 const getTimeZoneOffsetMs = (date, timeZone) => {
   const locale = 'en-US';
   const zonedDate = new Date(date.toLocaleString(locale, { timeZone }));
@@ -575,14 +583,14 @@ const getHoroscopeEmailCopy = (language) => {
     sr: {
       subject: 'Vaš dnevni horoskop',
       greeting: 'Dobro jutro',
-      intro: 'Personalizovani horoskop za',
+      intro: 'Vaš personalizovani horoskop',
       outro: 'Želimo vam miran i uspešan dan.',
       unsubscribe: 'Ako ne želite da dobijate ovaj horoskop, odjavite se ovde.',
     },
     en: {
       subject: 'Your daily horoscope',
       greeting: 'Good morning',
-      intro: 'Your personalized horoscope for',
+      intro: 'Your personalized horoscope',
       outro: 'Wishing you a calm and successful day.',
       unsubscribe: 'If you want to unsubscribe, click here.',
     },
@@ -627,7 +635,14 @@ const validateSignMentions = (text, sign1Label, sign2Label, signLabels) => {
   return mentioned.every((label) => label === sign1Label || label === sign2Label);
 };
 
-const generateDailyHoroscope = async ({ signKey, language, dateLabel, plan = 'basic', birthTime }) => {
+const generateDailyHoroscope = async ({
+  signKey,
+  language,
+  dateLabel,
+  plan = 'basic',
+  birthTime,
+  gender,
+}) => {
   if (!openai) return null;
   const normalizedLanguage = getSupportedLanguage(language);
   const signLabel = getZodiacLabel(signKey, normalizedLanguage);
@@ -635,23 +650,32 @@ const generateDailyHoroscope = async ({ signKey, language, dateLabel, plan = 'ba
   const languageLabel = getLanguageLabel(normalizedLanguage);
   const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
   const normalizedBirthTime = normalizeBirthTime(birthTime);
+  const normalizedGender = normalizeGender(gender);
   const birthTimeLine = normalizedBirthTime
     ? `Birth time (24h): ${normalizedBirthTime}. Use it to adjust the tone and focus, but do NOT mention the time directly.`
     : 'Birth time is not available; do not reference or infer it.';
+  const genderLine =
+    normalizedGender === 'male'
+      ? 'Use masculine grammatical gender when the language supports it (especially in Serbian). Do not mention gender explicitly.'
+      : normalizedGender === 'female'
+        ? 'Use feminine grammatical gender when the language supports it (especially in Serbian). Do not mention gender explicitly.'
+        : 'Use gender-neutral wording and avoid gendered adjectives when possible. Do not mention gender explicitly.';
 
   const prompt = normalizedPlan === 'premium'
     ? `
 You are an astrologer. Write a detailed daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
 ${birthTimeLine}
+${genderLine}
 Return ONLY a JSON object with keys "work", "health", and "love".
 Each value must contain 3 paragraphs separated by a blank line. Each paragraph should be 2-3 sentences.
 Write in second person, warm and specific.
-Do not mention any other zodiac signs, the ascendant, or the moon sign. Avoid lists and emojis.`
+Do not mention any zodiac sign names, the ascendant, or the moon sign. Avoid lists and emojis.`
     : `
 You are an astrologer. Write a daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
+${genderLine}
 Return ONLY a JSON object with keys "work", "health", and "love".
 Each value should be a short paragraph of 1-2 sentences, warm, and written in second person.
-Do not mention any other zodiac signs and avoid lists or emojis.`;
+Do not mention any zodiac sign names and avoid lists or emojis.`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -682,7 +706,7 @@ Do not mention any other zodiac signs and avoid lists or emojis.`;
     }
 
     const allLabels = Object.values(zodiacLabelsByLanguage[normalizedLanguage] || {});
-    if (containsDisallowedSign(`${work} ${health} ${love}`, [signLabel], allLabels)) {
+    if (containsDisallowedSign(`${work} ${health} ${love}`, [], allLabels)) {
       return null;
     }
 
@@ -698,16 +722,17 @@ Do not mention any other zodiac signs and avoid lists or emojis.`;
   }
 };
 
-const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dateLabel }) => {
+const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dateLabel, gender }) => {
   if (!pool) return null;
   const normalizedLanguage = getSupportedLanguage(language);
+  const normalizedGender = normalizeGender(gender);
   try {
     const { rows } = await pool.query(
       `SELECT work_text, health_text, love_text
        FROM daily_horoscopes
-       WHERE horoscope_date = $1 AND zodiac_sign = $2 AND language = $3
+       WHERE horoscope_date = $1 AND zodiac_sign = $2 AND language = $3 AND gender = $4
        LIMIT 1`,
-      [horoscopeDate, signKey, normalizedLanguage]
+      [horoscopeDate, signKey, normalizedLanguage, normalizedGender]
     );
     if (rows.length > 0) {
       return {
@@ -726,6 +751,7 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
     language: normalizedLanguage,
     dateLabel,
     plan: 'basic',
+    gender: normalizedGender,
   });
   if (!generated) return null;
 
@@ -735,11 +761,12 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
         horoscope_date,
         zodiac_sign,
         language,
+        gender,
         work_text,
         health_text,
         love_text
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (horoscope_date, zodiac_sign, language)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (horoscope_date, zodiac_sign, language, gender)
       DO UPDATE SET
         work_text = EXCLUDED.work_text,
         health_text = EXCLUDED.health_text,
@@ -748,6 +775,7 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
         horoscopeDate,
         signKey,
         normalizedLanguage,
+        normalizedGender,
         generated.work,
         generated.health,
         generated.love,
@@ -763,14 +791,13 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
 const sendDailyHoroscopeEmail = async ({
   email,
   firstName,
-  signLabel,
   dateLabel,
   sections,
   unsubscribeUrl,
   language,
 }) => {
   const copy = getHoroscopeEmailCopy(language);
-  const greetingName = firstName ? `, ${firstName}` : '';
+  const greetingName = firstName ? ` ${firstName}` : '';
   const workLabel = sections.labels?.work || 'Posao';
   const healthLabel = sections.labels?.health || 'Zdravlje';
   const loveLabel = sections.labels?.love || 'Ljubav';
@@ -797,7 +824,7 @@ const sendDailyHoroscopeEmail = async ({
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #e8e4ff; background-color: #0b0a13;">
       <h1 style="font-size: 22px; margin: 0 0 8px;">${escapeHtml(copy.greeting)}${escapeHtml(greetingName)}</h1>
-      <p style="margin: 0 0 16px; color: #b7b0d9;">${escapeHtml(copy.intro)} <strong>${escapeHtml(signLabel)}</strong> · ${escapeHtml(dateLabel)}</p>
+      <p style="margin: 0 0 16px; color: #b7b0d9;">${escapeHtml(copy.intro)} · ${escapeHtml(dateLabel)}</p>
       <div style="background: #171429; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
         ${renderSection(workLabel, sections.work)}
         ${renderSection(healthLabel, sections.health)}
@@ -814,7 +841,7 @@ const sendDailyHoroscopeEmail = async ({
 
   return sendResendEmail({
     to: email,
-    subject: `${copy.subject} · ${signLabel}`,
+    subject: copy.subject,
     html,
   });
 };
@@ -860,6 +887,7 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => 
   const language = getSupportedLanguage(subscription.language);
   const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
   const birthTime = normalizeBirthTime(subscription.birth_time);
+  const gender = normalizeGender(subscription.gender);
   const sendAt = subscription.next_send_at ? new Date(subscription.next_send_at) : new Date();
   const endAt = subscription.end_at ? new Date(subscription.end_at) : null;
   const sendCount = subscription.send_count || 0;
@@ -877,7 +905,7 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => 
 
   const horoscopeDate = getLocalDateKey(sendAt, timezone);
   const cacheKey = plan === 'basic'
-    ? `${horoscopeDate}:${language}:${subscription.zodiac_sign}`
+    ? `${horoscopeDate}:${language}:${subscription.zodiac_sign}:${gender}`
     : null;
   let horoscope = cacheKey ? cache.get(cacheKey) : null;
   const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
@@ -889,14 +917,16 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => 
           signKey: subscription.zodiac_sign,
           language,
           dateLabel,
+          gender,
         })
-      : await generateDailyHoroscope({
-          signKey: subscription.zodiac_sign,
-          language,
-          dateLabel,
-          plan,
-          birthTime,
-        });
+          : await generateDailyHoroscope({
+              signKey: subscription.zodiac_sign,
+              language,
+              dateLabel,
+              plan,
+              birthTime,
+              gender,
+            });
     if (!horoscope) {
       await logHoroscopeDelivery({
         subscriptionId: subscription.id,
@@ -913,13 +943,11 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => 
     }
   }
 
-  const signLabel = getZodiacLabel(subscription.zodiac_sign, language);
   const unsubscribeUrl = `${apiBaseUrl}/api/horoscope/unsubscribe?token=${subscription.unsubscribe_token}`;
 
   const sendResult = await sendDailyHoroscopeEmail({
     email: subscription.email,
     firstName: subscription.first_name,
-    signLabel,
     dateLabel,
     sections: horoscope,
     unsubscribeUrl,
@@ -966,6 +994,7 @@ async function createHoroscopeSubscription({
   lastName,
   birthDate,
   birthTime,
+  gender,
   language,
   timezone,
   plan,
@@ -977,6 +1006,7 @@ async function createHoroscopeSubscription({
   const normalizedLanguage = getSupportedLanguage(language);
   const normalizedTimezone = normalizeTimezone(timezone);
   const normalizedBirthTime = normalizeBirthTime(birthTime);
+  const normalizedGender = normalizeGender(gender);
   const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
 
   const now = new Date();
@@ -997,12 +1027,13 @@ async function createHoroscopeSubscription({
       timezone,
       plan,
       birth_time,
+      gender,
       status,
       start_at,
       end_at,
       next_send_at,
       unsubscribe_token
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, $13)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)`,
     [
       orderId || null,
       email,
@@ -1013,6 +1044,7 @@ async function createHoroscopeSubscription({
       normalizedTimezone,
       normalizedPlan,
       normalizedBirthTime,
+      normalizedGender,
       now,
       endAt,
       nextSendAt,
@@ -1043,6 +1075,7 @@ const dispatchDailyHoroscopes = async () => {
         timezone,
         plan,
         birth_time,
+        gender,
         next_send_at,
         end_at,
         send_count,
@@ -1237,9 +1270,11 @@ app.post('/api/orders', async (req, res) => {
     consultation_description,
     language,
     timezone,
+    gender,
   } = req.body || {};
 
   const normalizedBirthTime = String(birth_time || '').trim();
+  const normalizedGender = normalizeGender(gender);
 
   if (
     !product_id ||
@@ -1267,13 +1302,14 @@ app.post('/api/orders', async (req, res) => {
         last_name,
         birth_date,
         birth_time,
-        birth_place,
-        city,
-        country,
-        email,
-        note,
-        consultation_description
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      birth_place,
+      city,
+      country,
+      email,
+      gender,
+      note,
+      consultation_description
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id`,
       [
         product_id,
@@ -1287,6 +1323,7 @@ app.post('/api/orders', async (req, res) => {
         city,
         country,
         email,
+        normalizedGender,
         note || null,
         consultation_description || null,
       ]
@@ -1312,6 +1349,7 @@ app.post('/api/orders', async (req, res) => {
           lastName: last_name,
           birthDate: birth_date,
           birthTime: normalizedBirthTime,
+          gender: normalizedGender,
           language,
           timezone,
           plan,
@@ -1348,6 +1386,7 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
         city,
         country,
         email,
+        gender,
         note,
         consultation_description,
         status,
@@ -1474,6 +1513,7 @@ app.get('/api/horoscope/subscriptions', requireAuth, async (_req, res) => {
         zodiac_sign,
         language,
         timezone,
+        gender,
         plan,
         birth_time,
         status,
@@ -1565,6 +1605,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
     zodiac_sign,
     birth_date,
     birth_time,
+    gender,
     plan = 'basic',
     language = 'sr',
     timezone,
@@ -1594,6 +1635,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
   const normalizedLanguage = getSupportedLanguage(language);
   const normalizedTimezone = normalizeTimezone(timezone);
   const normalizedBirthTime = normalizeBirthTime(birth_time);
+  const normalizedGender = normalizeGender(gender);
 
   const now = new Date();
   const endAt = new Date(now);
@@ -1616,13 +1658,14 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
         timezone,
         plan,
         birth_time,
+        gender,
         status,
         start_at,
         end_at,
         next_send_at,
         unsubscribe_token
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, $13)
-      RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, next_send_at, end_at, send_count, unsubscribe_token`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)
+      RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, next_send_at, end_at, send_count, unsubscribe_token`,
       [
         null,
         normalizedEmail,
@@ -1633,6 +1676,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
         normalizedTimezone,
         normalizedPlan,
         normalizedBirthTime,
+        normalizedGender,
         now,
         endAt,
         nextSendAt,

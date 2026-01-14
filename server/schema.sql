@@ -11,11 +11,13 @@ CREATE TABLE IF NOT EXISTS orders (
   city TEXT NOT NULL,
   country TEXT NOT NULL,
   email TEXT NOT NULL,
+  gender TEXT NOT NULL DEFAULT 'unspecified',
   note TEXT NULL,
   consultation_description TEXT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT orders_status_check CHECK (status IN ('pending', 'processing', 'completed', 'cancelled'))
+  CONSTRAINT orders_status_check CHECK (status IN ('pending', 'processing', 'completed', 'cancelled')),
+  CONSTRAINT orders_gender_check CHECK (gender IN ('male', 'female', 'unspecified'))
 );
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   timezone TEXT NOT NULL DEFAULT 'Europe/Belgrade',
   plan TEXT NOT NULL DEFAULT 'basic',
   birth_time TIME NULL,
+  gender TEXT NOT NULL DEFAULT 'unspecified',
   status TEXT NOT NULL DEFAULT 'active',
   start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   end_at TIMESTAMPTZ NOT NULL,
@@ -58,7 +61,8 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   unsubscribed_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT horoscope_subscriptions_status_check CHECK (status IN ('active', 'completed', 'unsubscribed')),
-  CONSTRAINT horoscope_subscriptions_plan_check CHECK (plan IN ('basic', 'premium'))
+  CONSTRAINT horoscope_subscriptions_plan_check CHECK (plan IN ('basic', 'premium')),
+  CONSTRAINT horoscope_subscriptions_gender_check CHECK (gender IN ('male', 'female', 'unspecified'))
 );
 
 CREATE TABLE IF NOT EXISTS daily_horoscopes (
@@ -66,11 +70,13 @@ CREATE TABLE IF NOT EXISTS daily_horoscopes (
   horoscope_date DATE NOT NULL,
   zodiac_sign TEXT NOT NULL,
   language TEXT NOT NULL DEFAULT 'sr',
+  gender TEXT NOT NULL DEFAULT 'unspecified',
   work_text TEXT NOT NULL,
   health_text TEXT NOT NULL,
   love_text TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT daily_horoscopes_unique UNIQUE (horoscope_date, zodiac_sign, language)
+  CONSTRAINT daily_horoscopes_unique UNIQUE (horoscope_date, zodiac_sign, language, gender),
+  CONSTRAINT daily_horoscopes_gender_check CHECK (gender IN ('male', 'female', 'unspecified'))
 );
 
 CREATE TABLE IF NOT EXISTS horoscope_delivery_log (

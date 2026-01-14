@@ -47,6 +47,7 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
     birthDate: '',
     birthTime: '',
     plan: 'basic',
+    gender: 'female',
     sendNow: true,
   });
 
@@ -219,6 +220,7 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
         birth_date: testForm.birthDate,
         birth_time: testForm.birthTime || null,
         plan: testForm.plan as 'basic' | 'premium',
+        gender: testForm.gender as 'male' | 'female',
         language,
         timezone,
         send_now: testForm.sendNow,
@@ -241,6 +243,7 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
         birthDate: '',
         birthTime: '',
         plan: 'basic',
+        gender: 'female',
         sendNow: true,
       });
       setShowTestForm(false);
@@ -324,6 +327,23 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                   <SelectContent>
                     <SelectItem value="basic">{language === 'sr' ? 'Osnovni' : 'Basic'}</SelectItem>
                     <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {t('form.gender')}
+                </label>
+                <Select
+                  value={testForm.gender}
+                  onValueChange={(value) => setTestForm((prev) => ({ ...prev, gender: value }))}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="female">{t('form.gender.female')}</SelectItem>
+                    <SelectItem value="male">{t('form.gender.male')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

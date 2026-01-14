@@ -21,6 +21,7 @@ type Order = ApiOrder;
 
 type StatusFilter = 'all' | 'pending' | 'processing' | 'completed' | 'cancelled';
 type TimeFilter = 'all' | 'today' | 'week' | 'month' | 'year';
+type GenderFilter = 'all' | 'male' | 'female' | 'unspecified';
 type ZodiacSign = 'all' | 'aries' | 'taurus' | 'gemini' | 'cancer' | 'leo' | 'virgo' | 
                   'libra' | 'scorpio' | 'sagittarius' | 'capricorn' | 'aquarius' | 'pisces';
 
@@ -69,6 +70,7 @@ const Dashboard = () => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
   const [zodiacFilter, setZodiacFilter] = useState<ZodiacSign>('all');
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>('all');
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [usageDialogOpen, setUsageDialogOpen] = useState(false);
   const [horoscopeDialogOpen, setHoroscopeDialogOpen] = useState(false);
@@ -154,6 +156,11 @@ const Dashboard = () => {
       result = result.filter((o) => getZodiacSign(o.birth_date) === zodiacFilter);
     }
 
+    // Gender filter
+    if (genderFilter !== 'all') {
+      result = result.filter((o) => (o.gender || 'unspecified') === genderFilter);
+    }
+
     // Time filter
     if (timeFilter !== 'all') {
       const now = new Date();
@@ -183,7 +190,7 @@ const Dashboard = () => {
     }
 
     return result;
-  }, [orders, statusFilter, productFilter, timeFilter, zodiacFilter]);
+  }, [orders, statusFilter, productFilter, timeFilter, zodiacFilter, genderFilter]);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -220,6 +227,7 @@ const Dashboard = () => {
     const exportData = ordersToExport.map(order => ({
       [language === 'sr' ? 'Ime kupca' : 'Customer Name']: order.customer_name,
       'Email': order.email,
+      [language === 'sr' ? 'Pol' : 'Gender']: getGenderLabel(order.gender),
       [language === 'sr' ? 'Proizvod' : 'Product']: order.product_name,
       [language === 'sr' ? 'Datum rođenja' : 'Birth Date']: order.birth_date,
       [language === 'sr' ? 'Vreme rođenja' : 'Birth Time']: order.birth_time || '-',
@@ -292,6 +300,12 @@ const Dashboard = () => {
       cancelled: { sr: 'Otkazano', en: 'Cancelled' },
     };
     return statusLabels[status]?.[language] || status;
+  };
+
+  const getGenderLabel = (gender?: string | null) => {
+    if (gender === 'male') return language === 'sr' ? 'Muški' : 'Male';
+    if (gender === 'female') return language === 'sr' ? 'Ženski' : 'Female';
+    return language === 'sr' ? 'Nije navedeno' : 'Unspecified';
   };
 
   const StatCard = ({ 
@@ -399,6 +413,24 @@ const Dashboard = () => {
                   <SelectItem value="processing">{language === 'sr' ? 'U obradi' : 'Processing'}</SelectItem>
                   <SelectItem value="completed">{language === 'sr' ? 'Završeno' : 'Completed'}</SelectItem>
                   <SelectItem value="cancelled">{language === 'sr' ? 'Otkazano' : 'Cancelled'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Gender Filter */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">
+                {language === 'sr' ? 'Pol' : 'Gender'}
+              </label>
+              <Select value={genderFilter} onValueChange={(v) => setGenderFilter(v as GenderFilter)}>
+                <SelectTrigger className="w-[150px] bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{language === 'sr' ? 'Svi' : 'All'}</SelectItem>
+                  <SelectItem value="female">{language === 'sr' ? 'Ženski' : 'Female'}</SelectItem>
+                  <SelectItem value="male">{language === 'sr' ? 'Muški' : 'Male'}</SelectItem>
+                  <SelectItem value="unspecified">{language === 'sr' ? 'Nije navedeno' : 'Unspecified'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -518,7 +550,7 @@ const Dashboard = () => {
                 ({filteredOrders.length})
               </span>
             </h2>
-            {(statusFilter !== 'all' || timeFilter !== 'all' || productFilter !== 'all' || zodiacFilter !== 'all') && (
+            {(statusFilter !== 'all' || timeFilter !== 'all' || productFilter !== 'all' || zodiacFilter !== 'all' || genderFilter !== 'all') && (
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -527,6 +559,7 @@ const Dashboard = () => {
                   setTimeFilter('all');
                   setProductFilter('all');
                   setZodiacFilter('all');
+                  setGenderFilter('all');
                 }}
               >
                 {language === 'sr' ? 'Resetuj filtere' : 'Reset filters'}
@@ -595,6 +628,11 @@ const Dashboard = () => {
                               <Mail className="w-3 h-3" />
                               {order.email}
                             </div>
+                            {order.gender && order.gender !== 'unspecified' && (
+                              <div className="text-xs text-muted-foreground">
+                                {getGenderLabel(order.gender)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>

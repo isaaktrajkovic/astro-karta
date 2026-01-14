@@ -3,6 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -17,6 +24,7 @@ interface OrderFormProps {
 
 type PreviewData = {
   customerName: string;
+  gender: string;
   birthDate: string;
   birthTime: string;
   birthCity: string;
@@ -50,6 +58,7 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    gender: '',
     birthDate: '',
     birthTime: '',
     birthCity: '',
@@ -180,6 +189,22 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
       }
     }
 
+    const normalizedGender = formData.gender.trim();
+    if (!normalizedGender) {
+      toast({
+        title: language === 'sr' ? 'Pol nije izabran' : 'Gender missing',
+        description: language === 'sr'
+          ? 'Izaberite pol.'
+          : 'Please select a gender.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    const genderLabel = normalizedGender === 'male'
+      ? t('form.gender.male')
+      : t('form.gender.female');
+
     let fullNote = formData.note || '';
     if (isCompatibilityAnalysis) {
       const partnerInfo = `
@@ -201,6 +226,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       customer_name: customerName,
       first_name: formData.firstName,
       last_name: formData.lastName,
+      gender: normalizedGender,
       birth_date: normalizedBirthDate,
       birth_time: normalizedBirthTime,
       birth_place: `${formData.birthCity}, ${formData.birthCountry}`,
@@ -215,6 +241,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
 
     const preview: PreviewData = {
       customerName,
+      gender: genderLabel,
       birthDate: formatPreviewDate(normalizedBirthDate),
       birthTime: normalizedBirthTime,
       birthCity: formData.birthCity,
@@ -260,6 +287,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       setFormData({
         firstName: '',
         lastName: '',
+        gender: '',
         birthDate: '',
         birthTime: '',
         birthCity: '',
@@ -313,6 +341,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
               <h4 className="text-sm font-semibold text-foreground">{t('form.yourData')}</h4>
               <div className="mt-3 grid gap-2">
                 {renderPreviewRow(t('form.name'), previewData?.customerName || '')}
+                {renderPreviewRow(t('form.gender'), previewData?.gender || '')}
                 {renderPreviewRow(t('form.birthdate'), previewData?.birthDate || '')}
                 {renderPreviewRow(t('form.birthtime'), previewData?.birthTime || '')}
                 {renderPreviewRow(t('form.birthCity'), previewData?.birthCity || '')}
@@ -413,7 +442,24 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="gender" className="text-foreground">
+                {t('form.gender')} <span className="text-accent">*</span>
+              </Label>
+              <Select
+                value={formData.gender}
+                onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              >
+                <SelectTrigger id="gender" className="bg-secondary/50 border-border focus:border-primary">
+                  <SelectValue placeholder={t('form.genderSelect')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="female">{t('form.gender.female')}</SelectItem>
+                  <SelectItem value="male">{t('form.gender.male')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="birthDate" className="text-foreground">
                 {t('form.birthdate')} <span className="text-accent">*</span>

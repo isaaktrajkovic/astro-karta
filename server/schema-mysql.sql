@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS orders (
   city VARCHAR(255) NOT NULL,
   country VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
+  gender ENUM('male', 'female', 'unspecified') NOT NULL DEFAULT 'unspecified',
   note TEXT NULL,
   consultation_description TEXT NULL,
   status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Belgrade',
   plan ENUM('basic', 'premium') NOT NULL DEFAULT 'basic',
   birth_time TIME NULL,
+  gender ENUM('male', 'female', 'unspecified') NOT NULL DEFAULT 'unspecified',
   status ENUM('active', 'completed', 'unsubscribed') NOT NULL DEFAULT 'active',
   start_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   end_at TIMESTAMP NOT NULL,
@@ -62,11 +64,12 @@ CREATE TABLE IF NOT EXISTS daily_horoscopes (
   horoscope_date DATE NOT NULL,
   zodiac_sign VARCHAR(32) NOT NULL,
   language VARCHAR(8) NOT NULL DEFAULT 'sr',
+  gender ENUM('male', 'female', 'unspecified') NOT NULL DEFAULT 'unspecified',
   work_text TEXT NOT NULL,
   health_text TEXT NOT NULL,
   love_text TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY daily_horoscopes_unique (horoscope_date, zodiac_sign, language)
+  UNIQUE KEY daily_horoscopes_unique (horoscope_date, zodiac_sign, language, gender)
 );
 
 CREATE TABLE IF NOT EXISTS horoscope_delivery_log (

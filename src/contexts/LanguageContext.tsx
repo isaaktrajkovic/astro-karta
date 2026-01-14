@@ -456,6 +456,38 @@ export const translations: Translations = {
     es: 'Apellido', 
     ru: 'Фамилия' 
   },
+  'form.gender': {
+    sr: 'Pol',
+    en: 'Gender',
+    fr: 'Genre',
+    de: 'Geschlecht',
+    es: 'Género',
+    ru: 'Пол'
+  },
+  'form.genderSelect': {
+    sr: 'Izaberite pol',
+    en: 'Select gender',
+    fr: 'Sélectionner le genre',
+    de: 'Geschlecht wählen',
+    es: 'Seleccionar género',
+    ru: 'Выберите пол'
+  },
+  'form.gender.male': {
+    sr: 'Muški',
+    en: 'Male',
+    fr: 'Homme',
+    de: 'Männlich',
+    es: 'Masculino',
+    ru: 'Мужской'
+  },
+  'form.gender.female': {
+    sr: 'Ženski',
+    en: 'Female',
+    fr: 'Femme',
+    de: 'Weiblich',
+    es: 'Femenino',
+    ru: 'Женский'
+  },
   'form.birthdate': { 
     sr: 'Datum rođenja', 
     en: 'Birth Date', 

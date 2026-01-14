@@ -19,6 +19,7 @@ export interface Order {
   city: string;
   country: string;
   email: string;
+  gender: string | null;
   note: string | null;
   consultation_description: string | null;
   status: string;
@@ -47,6 +48,7 @@ export interface HoroscopeSubscription {
   zodiac_sign: string;
   language: string;
   timezone: string;
+  gender: string | null;
   plan: string;
   birth_time: string | null;
   status: string;
@@ -76,6 +78,7 @@ export interface CreateTestHoroscopeSubscriptionPayload {
   zodiac_sign: string;
   birth_date: string;
   birth_time?: string | null;
+  gender?: 'male' | 'female' | 'unspecified';
   plan?: 'basic' | 'premium';
   language?: string;
   timezone?: string;
