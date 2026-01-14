@@ -36,3 +36,38 @@ CREATE TABLE IF NOT EXISTS calculator_usage (
   compatibility INT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
+  id SERIAL PRIMARY KEY,
+  order_id INT NULL,
+  email TEXT NOT NULL,
+  first_name TEXT NULL,
+  last_name TEXT NULL,
+  zodiac_sign TEXT NOT NULL,
+  language TEXT NOT NULL DEFAULT 'sr',
+  timezone TEXT NOT NULL DEFAULT 'Europe/Belgrade',
+  status TEXT NOT NULL DEFAULT 'active',
+  start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  end_at TIMESTAMPTZ NOT NULL,
+  next_send_at TIMESTAMPTZ NULL,
+  last_sent_at TIMESTAMPTZ NULL,
+  send_count INT NOT NULL DEFAULT 0,
+  unsubscribe_token TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT horoscope_subscriptions_status_check CHECK (status IN ('active', 'completed', 'unsubscribed'))
+);
+
+CREATE TABLE IF NOT EXISTS daily_horoscopes (
+  id SERIAL PRIMARY KEY,
+  horoscope_date DATE NOT NULL,
+  zodiac_sign TEXT NOT NULL,
+  language TEXT NOT NULL DEFAULT 'sr',
+  work_text TEXT NOT NULL,
+  health_text TEXT NOT NULL,
+  love_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT daily_horoscopes_unique UNIQUE (horoscope_date, zodiac_sign, language)
+);
+
+CREATE INDEX IF NOT EXISTS horoscope_subscriptions_due_idx
+  ON horoscope_subscriptions (status, next_send_at);
