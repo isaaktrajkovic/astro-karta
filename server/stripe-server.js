@@ -428,7 +428,10 @@ const sendOrderNotifications = async ({
   });
 };
 
-const horoscopeSubscriptionProductIds = new Set(['monthly-basic']);
+const horoscopeSubscriptionPlans = new Map([
+  ['monthly-basic', 'basic'],
+  ['monthly-premium', 'premium'],
+]);
 
 const getSupportedLanguage = (language) =>
   Object.prototype.hasOwnProperty.call(languageLabelByCode, language) ? language : 'sr';
@@ -478,6 +481,17 @@ const normalizeTimezone = (timezone) => {
   } catch {
     return horoscopeDefaultTimezone;
   }
+};
+
+const normalizeBirthTime = (birthTime) => {
+  if (!birthTime) return null;
+  const match = String(birthTime).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
 const getTimeZoneOffsetMs = (date, timeZone) => {
@@ -611,24 +625,37 @@ const validateSignMentions = (text, sign1Label, sign2Label, signLabels) => {
   return mentioned.every((label) => label === sign1Label || label === sign2Label);
 };
 
-const generateDailyHoroscope = async ({ signKey, language, dateLabel }) => {
+const generateDailyHoroscope = async ({ signKey, language, dateLabel, plan = 'basic', birthTime }) => {
   if (!openai) return null;
   const normalizedLanguage = getSupportedLanguage(language);
   const signLabel = getZodiacLabel(signKey, normalizedLanguage);
   const sectionLabels = horoscopeSectionLabelsByLanguage[normalizedLanguage] || horoscopeSectionLabelsByLanguage.sr;
   const languageLabel = getLanguageLabel(normalizedLanguage);
+  const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
+  const normalizedBirthTime = normalizeBirthTime(birthTime);
+  const birthTimeLine = normalizedBirthTime
+    ? `Birth time (24h): ${normalizedBirthTime}. Use it to adjust the tone and focus, but do NOT mention the time directly.`
+    : 'Birth time is not available; do not reference or infer it.';
 
-  const prompt = `
+  const prompt = normalizedPlan === 'premium'
+    ? `
+You are an astrologer. Write a detailed daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
+${birthTimeLine}
+Return ONLY a JSON object with keys "work", "health", and "love".
+Each value must contain 3 paragraphs separated by a blank line. Each paragraph should be 2-3 sentences.
+Write in second person, warm and specific.
+Do not mention any other zodiac signs, the ascendant, or the moon sign. Avoid lists and emojis.`
+    : `
 You are an astrologer. Write a daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
 Return ONLY a JSON object with keys "work", "health", and "love".
-Each value should be 1-2 sentences, warm, and written in second person.
+Each value should be a short paragraph of 1-2 sentences, warm, and written in second person.
 Do not mention any other zodiac signs and avoid lists or emojis.`;
 
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      temperature: 0.65,
-      max_tokens: 200,
+      temperature: normalizedPlan === 'premium' ? 0.7 : 0.65,
+      max_tokens: normalizedPlan === 'premium' ? 700 : 220,
       messages: [
         { role: 'system', content: `Return JSON only. Use ${languageLabel}.` },
         { role: 'user', content: prompt },
@@ -643,6 +670,14 @@ Do not mention any other zodiac signs and avoid lists or emojis.`;
     const health = String(parsed.health || '').trim();
     const love = String(parsed.love || '').trim();
     if (!work || !health || !love) return null;
+
+    if (normalizedPlan === 'premium') {
+      const hasParagraphs = (value) =>
+        value.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean).length >= 3;
+      if (!hasParagraphs(work) || !hasParagraphs(health) || !hasParagraphs(love)) {
+        return null;
+      }
+    }
 
     const allLabels = Object.values(zodiacLabelsByLanguage[normalizedLanguage] || {});
     if (containsDisallowedSign(`${work} ${health} ${love}`, [signLabel], allLabels)) {
@@ -688,6 +723,7 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
     signKey,
     language: normalizedLanguage,
     dateLabel,
+    plan: 'basic',
   });
   if (!generated) return null;
 
@@ -736,15 +772,34 @@ const sendDailyHoroscopeEmail = async ({
   const workLabel = sections.labels?.work || 'Posao';
   const healthLabel = sections.labels?.health || 'Zdravlje';
   const loveLabel = sections.labels?.love || 'Ljubav';
+  const splitParagraphs = (value) =>
+    String(value || '')
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+  const renderSection = (label, value) => {
+    const paragraphs = splitParagraphs(value);
+    const body = paragraphs.length
+      ? paragraphs
+          .map((paragraph) => `<p style="margin: 0 0 8px;">${escapeHtml(paragraph)}</p>`)
+          .join('')
+      : `<p style="margin: 0;">-</p>`;
+    return `
+      <div style="margin-bottom: 12px;">
+        <div style="font-weight: 600; margin: 0 0 6px;">${escapeHtml(label)}:</div>
+        ${body}
+      </div>
+    `;
+  };
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #e8e4ff; background-color: #0b0a13;">
       <h1 style="font-size: 22px; margin: 0 0 8px;">${escapeHtml(copy.greeting)}${escapeHtml(greetingName)}</h1>
       <p style="margin: 0 0 16px; color: #b7b0d9;">${escapeHtml(copy.intro)} <strong>${escapeHtml(signLabel)}</strong> · ${escapeHtml(dateLabel)}</p>
       <div style="background: #171429; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-        <p style="margin: 0 0 10px;"><strong>${escapeHtml(workLabel)}:</strong> ${escapeHtml(sections.work)}</p>
-        <p style="margin: 0 0 10px;"><strong>${escapeHtml(healthLabel)}:</strong> ${escapeHtml(sections.health)}</p>
-        <p style="margin: 0;"><strong>${escapeHtml(loveLabel)}:</strong> ${escapeHtml(sections.love)}</p>
+        ${renderSection(workLabel, sections.work)}
+        ${renderSection(healthLabel, sections.health)}
+        ${renderSection(loveLabel, sections.love)}
       </div>
       <p style="margin: 0 0 16px; color: #b7b0d9;">${escapeHtml(copy.outro)}</p>
       <p style="margin: 0; font-size: 12px; color: #8a82b8;">
@@ -804,8 +859,10 @@ async function createHoroscopeSubscription({
   firstName,
   lastName,
   birthDate,
+  birthTime,
   language,
   timezone,
+  plan,
 }) {
   if (!pool) return;
   const zodiacSign = getZodiacSignFromDateString(birthDate);
@@ -813,6 +870,8 @@ async function createHoroscopeSubscription({
 
   const normalizedLanguage = getSupportedLanguage(language);
   const normalizedTimezone = normalizeTimezone(timezone);
+  const normalizedBirthTime = normalizeBirthTime(birthTime);
+  const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
 
   const now = new Date();
   const endAt = new Date(now);
@@ -830,12 +889,14 @@ async function createHoroscopeSubscription({
       zodiac_sign,
       language,
       timezone,
+      plan,
+      birth_time,
       status,
       start_at,
       end_at,
       next_send_at,
       unsubscribe_token
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10, $11)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, $13)`,
     [
       orderId || null,
       email,
@@ -844,6 +905,8 @@ async function createHoroscopeSubscription({
       zodiacSign,
       normalizedLanguage,
       normalizedTimezone,
+      normalizedPlan,
+      normalizedBirthTime,
       now,
       endAt,
       nextSendAt,
@@ -872,6 +935,8 @@ const dispatchDailyHoroscopes = async () => {
         zodiac_sign,
         language,
         timezone,
+        plan,
+        birth_time,
         next_send_at,
         end_at,
         send_count,
@@ -896,6 +961,8 @@ const dispatchDailyHoroscopes = async () => {
     for (const subscription of subscriptions) {
       const timezone = normalizeTimezone(subscription.timezone);
       const language = getSupportedLanguage(subscription.language);
+      const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
+      const birthTime = normalizeBirthTime(subscription.birth_time);
       const sendAt = new Date(subscription.next_send_at);
       const endAt = subscription.end_at ? new Date(subscription.end_at) : null;
       const sendCount = subscription.send_count || 0;
@@ -911,17 +978,27 @@ const dispatchDailyHoroscopes = async () => {
       }
 
       const horoscopeDate = getLocalDateKey(sendAt, timezone);
-      const cacheKey = `${horoscopeDate}:${language}:${subscription.zodiac_sign}`;
-      let horoscope = cache.get(cacheKey);
+      const cacheKey = plan === 'basic'
+        ? `${horoscopeDate}:${language}:${subscription.zodiac_sign}`
+        : null;
+      let horoscope = cacheKey ? cache.get(cacheKey) : null;
+      const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
 
       if (!horoscope) {
-        const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
-        horoscope = await getOrCreateDailyHoroscope({
-          horoscopeDate,
-          signKey: subscription.zodiac_sign,
-          language,
-          dateLabel,
-        });
+        horoscope = plan === 'basic'
+          ? await getOrCreateDailyHoroscope({
+              horoscopeDate,
+              signKey: subscription.zodiac_sign,
+              language,
+              dateLabel,
+            })
+          : await generateDailyHoroscope({
+              signKey: subscription.zodiac_sign,
+              language,
+              dateLabel,
+              plan,
+              birthTime,
+            });
         if (!horoscope) {
           await logHoroscopeDelivery({
             subscriptionId: subscription.id,
@@ -933,11 +1010,12 @@ const dispatchDailyHoroscopes = async () => {
           });
           continue;
         }
-        cache.set(cacheKey, horoscope);
+        if (cacheKey) {
+          cache.set(cacheKey, horoscope);
+        }
       }
 
       const signLabel = getZodiacLabel(subscription.zodiac_sign, language);
-      const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
       const unsubscribeUrl = `${apiBaseUrl}/api/horoscope/unsubscribe?token=${subscription.unsubscribe_token}`;
 
       const sendResult = await sendDailyHoroscopeEmail({
@@ -1216,7 +1294,8 @@ app.post('/api/orders', async (req, res) => {
       note,
     });
 
-    if (horoscopeSubscriptionProductIds.has(product_id)) {
+    const plan = horoscopeSubscriptionPlans.get(product_id);
+    if (plan) {
       try {
         await createHoroscopeSubscription({
           orderId: rows[0]?.id,
@@ -1224,8 +1303,10 @@ app.post('/api/orders', async (req, res) => {
           firstName: first_name,
           lastName: last_name,
           birthDate: birth_date,
+          birthTime: normalizedBirthTime,
           language,
           timezone,
+          plan,
         });
       } catch (subscriptionError) {
         console.error('Failed to create horoscope subscription:', subscriptionError);
@@ -1351,6 +1432,8 @@ app.get('/api/horoscope/subscriptions', requireAuth, async (_req, res) => {
         zodiac_sign,
         language,
         timezone,
+        plan,
+        birth_time,
         status,
         start_at,
         end_at,

@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   zodiac_sign TEXT NOT NULL,
   language TEXT NOT NULL DEFAULT 'sr',
   timezone TEXT NOT NULL DEFAULT 'Europe/Belgrade',
+  plan TEXT NOT NULL DEFAULT 'basic',
+  birth_time TIME NULL,
   status TEXT NOT NULL DEFAULT 'active',
   start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   end_at TIMESTAMPTZ NOT NULL,
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   unsubscribe_token TEXT NOT NULL UNIQUE,
   unsubscribed_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT horoscope_subscriptions_status_check CHECK (status IN ('active', 'completed', 'unsubscribed'))
+  CONSTRAINT horoscope_subscriptions_status_check CHECK (status IN ('active', 'completed', 'unsubscribed')),
+  CONSTRAINT horoscope_subscriptions_plan_check CHECK (plan IN ('basic', 'premium'))
 );
 
 CREATE TABLE IF NOT EXISTS daily_horoscopes (

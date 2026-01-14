@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   zodiac_sign VARCHAR(32) NOT NULL,
   language VARCHAR(8) NOT NULL DEFAULT 'sr',
   timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Belgrade',
+  plan ENUM('basic', 'premium') NOT NULL DEFAULT 'basic',
+  birth_time TIME NULL,
   status ENUM('active', 'completed', 'unsubscribed') NOT NULL DEFAULT 'active',
   start_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   end_at TIMESTAMP NOT NULL,

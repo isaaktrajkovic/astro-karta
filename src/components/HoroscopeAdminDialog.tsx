@@ -105,6 +105,10 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
   };
 
   const getZodiacLabel = (signKey: string) => t(`zodiac.${signKey}`) || signKey;
+  const getPlanLabel = (plan: string) =>
+    plan === 'premium'
+      ? (language === 'sr' ? 'Premium' : 'Premium')
+      : (language === 'sr' ? 'Osnovni' : 'Basic');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,6 +184,7 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                     <tr>
                       <th className="p-3 text-left">{language === 'sr' ? 'Email' : 'Email'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Znak' : 'Sign'}</th>
+                      <th className="p-3 text-left">{language === 'sr' ? 'Plan' : 'Plan'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Status' : 'Status'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Sledeće slanje' : 'Next send'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Poslednje slanje' : 'Last sent'}</th>
@@ -196,6 +201,7 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                           </div>
                         </td>
                         <td className="p-3 text-foreground">{getZodiacLabel(subscription.zodiac_sign)}</td>
+                        <td className="p-3 text-foreground">{getPlanLabel(subscription.plan)}</td>
                         <td className="p-3">
                           <span className={`inline-flex rounded-full px-2 py-1 text-xs ${getStatusStyle(subscription.status)}`}>
                             {subscription.status}

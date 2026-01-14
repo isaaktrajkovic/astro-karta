@@ -47,6 +47,8 @@ export interface HoroscopeSubscription {
   zodiac_sign: string;
   language: string;
   timezone: string;
+  plan: string;
+  birth_time: string | null;
   status: string;
   start_at: string;
   end_at: string;
