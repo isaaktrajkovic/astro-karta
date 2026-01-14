@@ -381,7 +381,20 @@ const sendOrderNotifications = async ({
   birthPlace,
   birthTime,
   note,
+  language,
 }) => {
+  const copy = getOrderEmailCopy(language);
+  const templateValues = {
+    name: customerName,
+    product: productName,
+  };
+  const heroTitle = formatOrderTemplate(copy.heroTitle, templateValues);
+  const heroSubtitle = formatOrderTemplate(copy.heroSubtitle, templateValues);
+  const safeBirthDate = escapeHtml(birthDate);
+  const safeBirthTime = escapeHtml(birthTime || '-');
+  const safeBirthPlace = escapeHtml(birthPlace);
+  const safeNote = note ? escapeHtml(note) : '';
+
   if (adminNotificationEmail) {
     await sendResendEmail({
       to: adminNotificationEmail,
@@ -405,7 +418,7 @@ const sendOrderNotifications = async ({
 
   await sendResendEmail({
     to: email,
-    subject: `Vaša narudžbina je primljena - ${productName}`,
+    subject: copy.subject(productName),
     html: `
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0b0a13; padding:24px; font-family:Arial, sans-serif; color:#e8e4ff;">
         <tr>
@@ -413,45 +426,45 @@ const sendOrderNotifications = async ({
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px; background-color:#17122b; border:1px solid #2a2248; border-radius:16px; overflow:hidden;">
               <tr>
                 <td style="background:linear-gradient(135deg,#7c3aed 0%,#db2777 100%); padding:24px 28px; color:#fff;">
-                  <h1 style="margin:0 0 6px; font-size:24px; line-height:1.3;">Hvala vam na narudžbini, ${customerName}!</h1>
-                  <p style="margin:0; font-size:14px; opacity:.95;">Vaša narudžbina za <strong>${productName}</strong> je uspešno primljena.</p>
+                  <h1 style="margin:0 0 6px; font-size:24px; line-height:1.3;">${heroTitle}</h1>
+                  <p style="margin:0; font-size:14px; opacity:.95;">${heroSubtitle}</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding:24px 28px;">
-                  <h2 style="margin:0 0 12px; font-size:16px; color:#c9b8ff; text-transform:uppercase; letter-spacing:.08em;">Detalji</h2>
+                  <h2 style="margin:0 0 12px; font-size:16px; color:#c9b8ff; text-transform:uppercase; letter-spacing:.08em;">${copy.detailsTitle}</h2>
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
                     <tr>
-                      <td style="padding:8px 0; color:#a59ac7;">Datum rođenja</td>
-                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthDate}</td>
+                      <td style="padding:8px 0; color:#a59ac7;">${copy.labels.birthDate}</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${safeBirthDate}</td>
                     </tr>
                     <tr>
-                      <td style="padding:8px 0; color:#a59ac7;">Vreme rođenja</td>
-                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthTime || '-'}</td>
+                      <td style="padding:8px 0; color:#a59ac7;">${copy.labels.birthTime}</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${safeBirthTime}</td>
                     </tr>
                     <tr>
-                      <td style="padding:8px 0; color:#a59ac7;">Mesto rođenja</td>
-                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${birthPlace}</td>
+                      <td style="padding:8px 0; color:#a59ac7;">${copy.labels.birthPlace}</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff;">${safeBirthPlace}</td>
                     </tr>
                     ${
                       note
                         ? `
                     <tr>
-                      <td style="padding:8px 0; color:#a59ac7; vertical-align:top;">Napomena</td>
-                      <td style="padding:8px 0; text-align:right; color:#ffffff; white-space:pre-wrap;">${note}</td>
+                      <td style="padding:8px 0; color:#a59ac7; vertical-align:top;">${copy.labels.note}</td>
+                      <td style="padding:8px 0; text-align:right; color:#ffffff; white-space:pre-wrap;">${safeNote}</td>
                     </tr>`
                         : ''
                     }
                   </table>
                   <p style="margin:20px 0 0; font-size:14px; color:#d7cff5;">
-                    Vaš astrološki izveštaj ćete dobiti na ovaj email u najkraćem mogućem roku.
+                    ${copy.reportLine}
                   </p>
-                  <p style="margin:16px 0 0; font-size:14px; color:#c9b8ff;">Srdačan pozdrav,<br>Astro Portal Tim</p>
+                  <p style="margin:16px 0 0; font-size:14px; color:#c9b8ff;">${copy.signOffLine1}<br>${copy.signOffLine2}</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding:14px 28px; background-color:#120f22; color:#8d82b8; font-size:12px; text-align:center;">
-                  Ova poruka je automatski poslata. Ako imate pitanja, odgovorite na ovaj email.
+                  ${copy.footer}
                 </td>
               </tr>
             </table>
@@ -615,6 +628,112 @@ const escapeHtml = (value) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const formatOrderTemplate = (template, values) =>
+  String(template || '').replace(/\{(\w+)\}/g, (_match, key) => escapeHtml(values?.[key] ?? ''));
+
+const getOrderEmailCopy = (language) => {
+  const normalized = getSupportedLanguage(language);
+  const copy = {
+    sr: {
+      subject: (productName) => `Vaša narudžbina je primljena - ${productName}`,
+      heroTitle: 'Hvala vam na narudžbini, {name}!',
+      heroSubtitle: 'Vaša narudžbina za {product} je uspešno primljena.',
+      detailsTitle: 'Detalji',
+      labels: {
+        birthDate: 'Datum rođenja',
+        birthTime: 'Vreme rođenja',
+        birthPlace: 'Mesto rođenja',
+        note: 'Napomena',
+      },
+      reportLine: 'Vaš astrološki izveštaj ćete dobiti na ovaj email u najkraćem mogućem roku.',
+      signOffLine1: 'Srdačan pozdrav,',
+      signOffLine2: 'Astro Portal Tim',
+      footer: 'Ova poruka je automatski poslata. Ako imate pitanja, odgovorite na ovaj email.',
+    },
+    en: {
+      subject: (productName) => `Your order has been received - ${productName}`,
+      heroTitle: 'Thank you for your order, {name}!',
+      heroSubtitle: 'Your order for {product} has been received successfully.',
+      detailsTitle: 'Details',
+      labels: {
+        birthDate: 'Birth date',
+        birthTime: 'Birth time',
+        birthPlace: 'Place of birth',
+        note: 'Note',
+      },
+      reportLine: 'Your astrological report will be sent to this email as soon as possible.',
+      signOffLine1: 'Best regards,',
+      signOffLine2: 'Astro Portal Team',
+      footer: 'This message was sent automatically. If you have questions, reply to this email.',
+    },
+    fr: {
+      subject: (productName) => `Votre commande a été reçue - ${productName}`,
+      heroTitle: 'Merci pour votre commande, {name} !',
+      heroSubtitle: 'Votre commande pour {product} a bien été reçue.',
+      detailsTitle: 'Détails',
+      labels: {
+        birthDate: 'Date de naissance',
+        birthTime: 'Heure de naissance',
+        birthPlace: 'Lieu de naissance',
+        note: 'Note',
+      },
+      reportLine: 'Votre rapport astrologique sera envoyé à cet email dès que possible.',
+      signOffLine1: 'Cordialement,',
+      signOffLine2: 'Équipe Astro Portal',
+      footer: 'Ce message a été envoyé automatiquement. Si vous avez des questions, répondez à cet email.',
+    },
+    de: {
+      subject: (productName) => `Ihre Bestellung ist eingegangen - ${productName}`,
+      heroTitle: 'Vielen Dank für Ihre Bestellung, {name}!',
+      heroSubtitle: 'Ihre Bestellung für {product} ist erfolgreich eingegangen.',
+      detailsTitle: 'Details',
+      labels: {
+        birthDate: 'Geburtsdatum',
+        birthTime: 'Geburtszeit',
+        birthPlace: 'Geburtsort',
+        note: 'Notiz',
+      },
+      reportLine: 'Ihr astrologischer Bericht wird so schnell wie möglich an diese E-Mail gesendet.',
+      signOffLine1: 'Mit freundlichen Grüßen,',
+      signOffLine2: 'Astro Portal Team',
+      footer: 'Diese Nachricht wurde automatisch gesendet. Bei Fragen antworten Sie auf diese E-Mail.',
+    },
+    es: {
+      subject: (productName) => `Tu pedido ha sido recibido - ${productName}`,
+      heroTitle: 'Gracias por tu pedido, {name}!',
+      heroSubtitle: 'Tu pedido de {product} se ha recibido correctamente.',
+      detailsTitle: 'Detalles',
+      labels: {
+        birthDate: 'Fecha de nacimiento',
+        birthTime: 'Hora de nacimiento',
+        birthPlace: 'Lugar de nacimiento',
+        note: 'Nota',
+      },
+      reportLine: 'Tu informe astrológico se enviará a este correo lo antes posible.',
+      signOffLine1: 'Un saludo cordial,',
+      signOffLine2: 'Equipo Astro Portal',
+      footer: 'Este mensaje se envió automáticamente. Si tienes preguntas, responde a este correo.',
+    },
+    ru: {
+      subject: (productName) => `Ваш заказ получен - ${productName}`,
+      heroTitle: 'Спасибо за ваш заказ, {name}!',
+      heroSubtitle: 'Ваш заказ на {product} успешно получен.',
+      detailsTitle: 'Детали',
+      labels: {
+        birthDate: 'Дата рождения',
+        birthTime: 'Время рождения',
+        birthPlace: 'Место рождения',
+        note: 'Примечание',
+      },
+      reportLine: 'Ваш астрологический отчет будет отправлен на этот email в ближайшее время.',
+      signOffLine1: 'С уважением,',
+      signOffLine2: 'Команда Astro Portal',
+      footer: 'Это сообщение отправлено автоматически. Если у вас есть вопросы, ответьте на это письмо.',
+    },
+  };
+  return copy[normalized] || copy.sr;
+};
 
 const getHoroscopeEmailCopy = (language) => {
   const normalized = getSupportedLanguage(language);
@@ -1406,6 +1525,7 @@ app.post('/api/orders', async (req, res) => {
       birthPlace: birth_place,
       birthTime: normalizedBirthTime,
       note,
+      language,
     });
 
     const plan = horoscopeSubscriptionPlans.get(product_id);
