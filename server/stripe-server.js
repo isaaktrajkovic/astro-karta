@@ -33,6 +33,9 @@ const horoscopeDurationDays = Number(process.env.HOROSCOPE_DURATION_DAYS || 30);
 const horoscopeSchedulerIntervalMs = Number(process.env.HOROSCOPE_SCHEDULER_INTERVAL_MS || 5 * 60 * 1000);
 const horoscopeSchedulerEnabled = process.env.HOROSCOPE_SCHEDULER_ENABLED !== 'false';
 const horoscopeBatchSize = Number(process.env.HOROSCOPE_BATCH_SIZE || 200);
+const compatibilityCacheTtlMs = Number(process.env.COMPATIBILITY_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000);
+const compatibilityCacheMax = Number(process.env.COMPATIBILITY_CACHE_MAX || 500);
+const compatibilityCache = new Map();
 
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 
@@ -873,6 +876,32 @@ const parseJsonFromText = (text) => {
 };
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildCompatibilityCacheKey = (sign1, sign2, compatibility, language) => {
+  const first = String(sign1 || '').trim().toLowerCase();
+  const second = String(sign2 || '').trim().toLowerCase();
+  const pair = [first, second].sort().join(':');
+  return `${pair}:${compatibility}:${language}`;
+};
+
+const getCachedCompatibility = (key) => {
+  const entry = compatibilityCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    compatibilityCache.delete(key);
+    return null;
+  }
+  return entry.text;
+};
+
+const setCachedCompatibility = (key, text) => {
+  if (!text) return;
+  if (compatibilityCache.size >= compatibilityCacheMax) {
+    const oldestKey = compatibilityCache.keys().next().value;
+    if (oldestKey) compatibilityCache.delete(oldestKey);
+  }
+  compatibilityCache.set(key, { text, expiresAt: Date.now() + compatibilityCacheTtlMs });
+};
 
 const hasExactSign = (text, signLabel) => {
   if (!text || !signLabel) return false;
@@ -2123,16 +2152,24 @@ app.post('/api/compatibility-llm', llmLimiter, async (req, res) => {
   }
 
   const { sign1, sign2, compatibility, language = 'sr' } = req.body || {};
+  const normalizedSign1 = String(sign1 || '').trim().toLowerCase();
+  const normalizedSign2 = String(sign2 || '').trim().toLowerCase();
 
-  if (!sign1 || !sign2 || typeof compatibility !== 'number') {
+  if (!normalizedSign1 || !normalizedSign2 || typeof compatibility !== 'number') {
     return res.status(400).json({ error: 'Missing sign1/sign2/compatibility' });
   }
 
   const normalizedLanguage = getSupportedLanguage(language);
+  const cacheKey = buildCompatibilityCacheKey(normalizedSign1, normalizedSign2, compatibility, normalizedLanguage);
+  const cachedText = getCachedCompatibility(cacheKey);
+  if (cachedText) {
+    return res.json({ text: cachedText });
+  }
+
   const languageLabel = getLanguageLabel(normalizedLanguage);
   const signLabels = zodiacLabelsByLanguage[normalizedLanguage] || zodiacLabelsByLanguage.sr;
-  const sign1Label = signLabels?.[sign1] || sign1;
-  const sign2Label = signLabels?.[sign2] || sign2;
+  const sign1Label = signLabels?.[normalizedSign1] || normalizedSign1;
+  const sign2Label = signLabels?.[normalizedSign2] || normalizedSign2;
 
   const prompt = `
 You are an astrologer copywriter. Write ONE short paragraph (max 80 words) in ${languageLabel}.
@@ -2159,6 +2196,7 @@ No lists, no headings—just a single paragraph.`;
     if (!validateSignMentions(text, sign1Label, sign2Label, allSignLabels)) {
       return res.json({ text: null });
     }
+    setCachedCompatibility(cacheKey, text);
     return res.json({ text });
   } catch (err) {
     console.error('LLM error', err);
