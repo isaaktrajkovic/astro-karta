@@ -71,6 +71,19 @@ export interface HoroscopeDeliveryLog {
   created_at: string;
 }
 
+export interface CreateTestHoroscopeSubscriptionPayload {
+  email: string;
+  zodiac_sign: string;
+  birth_date: string;
+  birth_time?: string | null;
+  plan?: 'basic' | 'premium';
+  language?: string;
+  timezone?: string;
+  send_now?: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
 const getAuthToken = () => localStorage.getItem(authTokenKey);
 
 const setAuthToken = (token: string | null) => {
@@ -205,3 +218,13 @@ export const getHoroscopeDeliveries = (limit = 200) =>
     method: 'GET',
     auth: true,
   });
+
+export const createTestHoroscopeSubscription = (payload: CreateTestHoroscopeSubscriptionPayload) =>
+  request<{ success: true; subscription_id: string; sent: boolean }>(
+    '/api/horoscope/test-subscription',
+    {
+      method: 'POST',
+      auth: true,
+      body: JSON.stringify(payload),
+    }
+  );

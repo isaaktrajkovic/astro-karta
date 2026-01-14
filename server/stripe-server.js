@@ -194,6 +194,8 @@ const horoscopeSectionLabelsByLanguage = {
   ru: { work: 'Работа', health: 'Здоровье', love: 'Любовь' },
 };
 
+const zodiacSignKeys = Object.keys(zodiacLabelsByLanguage.sr);
+
 const toBase64Url = (value) => Buffer.from(value).toString('base64url');
 
 const signToken = (payload, expiresInSeconds = 60 * 60 * 24 * 7) => {
@@ -853,6 +855,110 @@ const logHoroscopeDelivery = async ({
   }
 };
 
+const deliverSubscriptionHoroscope = async (subscription, cache = new Map()) => {
+  const timezone = normalizeTimezone(subscription.timezone);
+  const language = getSupportedLanguage(subscription.language);
+  const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
+  const birthTime = normalizeBirthTime(subscription.birth_time);
+  const sendAt = subscription.next_send_at ? new Date(subscription.next_send_at) : new Date();
+  const endAt = subscription.end_at ? new Date(subscription.end_at) : null;
+  const sendCount = subscription.send_count || 0;
+  const now = new Date();
+
+  if (sendCount >= horoscopeDurationDays || (endAt && endAt <= now)) {
+    await pool.query(
+      `UPDATE horoscope_subscriptions
+       SET status = 'completed', next_send_at = NULL
+       WHERE id = $1`,
+      [subscription.id]
+    );
+    return { ok: false, skipped: true };
+  }
+
+  const horoscopeDate = getLocalDateKey(sendAt, timezone);
+  const cacheKey = plan === 'basic'
+    ? `${horoscopeDate}:${language}:${subscription.zodiac_sign}`
+    : null;
+  let horoscope = cacheKey ? cache.get(cacheKey) : null;
+  const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
+
+  if (!horoscope) {
+    horoscope = plan === 'basic'
+      ? await getOrCreateDailyHoroscope({
+          horoscopeDate,
+          signKey: subscription.zodiac_sign,
+          language,
+          dateLabel,
+        })
+      : await generateDailyHoroscope({
+          signKey: subscription.zodiac_sign,
+          language,
+          dateLabel,
+          plan,
+          birthTime,
+        });
+    if (!horoscope) {
+      await logHoroscopeDelivery({
+        subscriptionId: subscription.id,
+        email: subscription.email,
+        zodiacSign: subscription.zodiac_sign,
+        horoscopeDate,
+        status: 'failed',
+        errorMessage: 'horoscope_generation_failed',
+      });
+      return { ok: false };
+    }
+    if (cacheKey) {
+      cache.set(cacheKey, horoscope);
+    }
+  }
+
+  const signLabel = getZodiacLabel(subscription.zodiac_sign, language);
+  const unsubscribeUrl = `${apiBaseUrl}/api/horoscope/unsubscribe?token=${subscription.unsubscribe_token}`;
+
+  const sendResult = await sendDailyHoroscopeEmail({
+    email: subscription.email,
+    firstName: subscription.first_name,
+    signLabel,
+    dateLabel,
+    sections: horoscope,
+    unsubscribeUrl,
+    language,
+  });
+
+  await logHoroscopeDelivery({
+    subscriptionId: subscription.id,
+    email: subscription.email,
+    zodiacSign: subscription.zodiac_sign,
+    horoscopeDate,
+    status: sendResult?.ok ? 'sent' : 'failed',
+    providerId: sendResult?.id,
+    errorMessage: sendResult?.ok ? null : sendResult?.error || 'send_failed',
+  });
+
+  if (!sendResult?.ok) {
+    return { ok: false };
+  }
+
+  const updatedSendCount = sendCount + 1;
+  const completed = updatedSendCount >= horoscopeDurationDays;
+  const nextSendAt = completed
+    ? null
+    : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, horoscopeSendHour);
+
+  await pool.query(
+    `UPDATE horoscope_subscriptions
+     SET last_sent_at = $1,
+         send_count = $2,
+         next_send_at = $3,
+         status = $4
+     WHERE id = $5`,
+    [now, updatedSendCount, nextSendAt, completed ? 'completed' : 'active', subscription.id]
+  );
+
+  return { ok: true };
+};
+
 async function createHoroscopeSubscription({
   orderId,
   email,
@@ -956,107 +1062,9 @@ const dispatchDailyHoroscopes = async () => {
     }
 
     const cache = new Map();
-    const now = new Date();
 
     for (const subscription of subscriptions) {
-      const timezone = normalizeTimezone(subscription.timezone);
-      const language = getSupportedLanguage(subscription.language);
-      const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
-      const birthTime = normalizeBirthTime(subscription.birth_time);
-      const sendAt = new Date(subscription.next_send_at);
-      const endAt = subscription.end_at ? new Date(subscription.end_at) : null;
-      const sendCount = subscription.send_count || 0;
-
-      if (sendCount >= horoscopeDurationDays || (endAt && endAt <= now)) {
-        await pool.query(
-          `UPDATE horoscope_subscriptions
-           SET status = 'completed', next_send_at = NULL
-           WHERE id = $1`,
-          [subscription.id]
-        );
-        continue;
-      }
-
-      const horoscopeDate = getLocalDateKey(sendAt, timezone);
-      const cacheKey = plan === 'basic'
-        ? `${horoscopeDate}:${language}:${subscription.zodiac_sign}`
-        : null;
-      let horoscope = cacheKey ? cache.get(cacheKey) : null;
-      const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
-
-      if (!horoscope) {
-        horoscope = plan === 'basic'
-          ? await getOrCreateDailyHoroscope({
-              horoscopeDate,
-              signKey: subscription.zodiac_sign,
-              language,
-              dateLabel,
-            })
-          : await generateDailyHoroscope({
-              signKey: subscription.zodiac_sign,
-              language,
-              dateLabel,
-              plan,
-              birthTime,
-            });
-        if (!horoscope) {
-          await logHoroscopeDelivery({
-            subscriptionId: subscription.id,
-            email: subscription.email,
-            zodiacSign: subscription.zodiac_sign,
-            horoscopeDate,
-            status: 'failed',
-            errorMessage: 'horoscope_generation_failed',
-          });
-          continue;
-        }
-        if (cacheKey) {
-          cache.set(cacheKey, horoscope);
-        }
-      }
-
-      const signLabel = getZodiacLabel(subscription.zodiac_sign, language);
-      const unsubscribeUrl = `${apiBaseUrl}/api/horoscope/unsubscribe?token=${subscription.unsubscribe_token}`;
-
-      const sendResult = await sendDailyHoroscopeEmail({
-        email: subscription.email,
-        firstName: subscription.first_name,
-        signLabel,
-        dateLabel,
-        sections: horoscope,
-        unsubscribeUrl,
-        language,
-      });
-
-      await logHoroscopeDelivery({
-        subscriptionId: subscription.id,
-        email: subscription.email,
-        zodiacSign: subscription.zodiac_sign,
-        horoscopeDate,
-        status: sendResult?.ok ? 'sent' : 'failed',
-        providerId: sendResult?.id,
-        errorMessage: sendResult?.ok ? null : sendResult?.error || 'send_failed',
-      });
-
-      if (!sendResult?.ok) {
-        continue;
-      }
-
-      const updatedSendCount = sendCount + 1;
-      const completed = updatedSendCount >= horoscopeDurationDays;
-      const nextSendAt = completed
-        ? null
-        : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, horoscopeSendHour);
-
-      await pool.query(
-        `UPDATE horoscope_subscriptions
-         SET last_sent_at = $1,
-             send_count = $2,
-             next_send_at = $3,
-             status = $4
-         WHERE id = $5`,
-        [now, updatedSendCount, nextSendAt, completed ? 'completed' : 'active', subscription.id]
-      );
+      await deliverSubscriptionHoroscope(subscription, cache);
     }
   } catch (error) {
     console.error('Failed to dispatch horoscopes:', error);
@@ -1515,6 +1523,118 @@ app.get('/api/horoscope/deliveries', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Failed to fetch horoscope deliveries:', error);
     return res.status(500).json({ error: 'Failed to fetch deliveries' });
+  }
+});
+
+app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const {
+    email,
+    first_name,
+    last_name,
+    zodiac_sign,
+    birth_date,
+    birth_time,
+    plan = 'basic',
+    language = 'sr',
+    timezone,
+    send_now = true,
+  } = req.body || {};
+
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const normalizedBirthDate = String(birth_date || '').trim();
+  const computedSign = getZodiacSignFromDateString(normalizedBirthDate);
+  if (!computedSign) {
+    return res.status(400).json({ error: 'Invalid birth date' });
+  }
+
+  const normalizedSign = String(zodiac_sign || '').trim().toLowerCase();
+  if (!zodiacSignKeys.includes(normalizedSign)) {
+    return res.status(400).json({ error: 'Invalid zodiac sign' });
+  }
+  if (normalizedSign !== computedSign) {
+    return res.status(400).json({ error: 'Zodiac sign does not match birth date' });
+  }
+
+  const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
+  const normalizedLanguage = getSupportedLanguage(language);
+  const normalizedTimezone = normalizeTimezone(timezone);
+  const normalizedBirthTime = normalizeBirthTime(birth_time);
+
+  const now = new Date();
+  const endAt = new Date(now);
+  endAt.setDate(endAt.getDate() + horoscopeDurationDays);
+
+  const nextSendAt = send_now
+    ? now
+    : getNextSendAt(now, normalizedTimezone, horoscopeSendHour);
+  const unsubscribeToken = crypto.randomBytes(24).toString('hex');
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO horoscope_subscriptions (
+        order_id,
+        email,
+        first_name,
+        last_name,
+        zodiac_sign,
+        language,
+        timezone,
+        plan,
+        birth_time,
+        status,
+        start_at,
+        end_at,
+        next_send_at,
+        unsubscribe_token
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, $13)
+      RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, next_send_at, end_at, send_count, unsubscribe_token`,
+      [
+        null,
+        normalizedEmail,
+        first_name || null,
+        last_name || null,
+        normalizedSign,
+        normalizedLanguage,
+        normalizedTimezone,
+        normalizedPlan,
+        normalizedBirthTime,
+        now,
+        endAt,
+        nextSendAt,
+        unsubscribeToken,
+      ]
+    );
+
+    const subscription = rows[0];
+    if (!subscription) {
+      return res.status(500).json({ error: 'Failed to create subscription' });
+    }
+
+    if (send_now) {
+      if (!openai || !resendApiKey || !resendFromEmail) {
+        return res.status(400).json({ error: 'Email/OpenAI not configured' });
+      }
+
+      const sendResult = await deliverSubscriptionHoroscope(subscription, new Map());
+      return res.json({
+        success: true,
+        subscription_id: subscription.id,
+        sent: Boolean(sendResult?.ok),
+      });
+    }
+
+    return res.json({ success: true, subscription_id: subscription.id, sent: false });
+  } catch (error) {
+    console.error('Failed to create test subscription:', error);
+    return res.status(500).json({ error: 'Failed to create test subscription' });
   }
 });
 

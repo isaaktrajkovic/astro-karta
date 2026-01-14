@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Mail, Calendar, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { RefreshCw, Mail, Calendar, CheckCircle2, AlertCircle, Clock, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,9 +7,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import {
+  createTestHoroscopeSubscription,
   getHoroscopeDeliveries,
   getHoroscopeSubscriptions,
   HoroscopeDeliveryLog,
@@ -26,8 +36,35 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
   const [subscriptions, setSubscriptions] = useState<HoroscopeSubscription[]>([]);
   const [deliveries, setDeliveries] = useState<HoroscopeDeliveryLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showTestForm, setShowTestForm] = useState(false);
+  const [isCreatingTest, setIsCreatingTest] = useState(false);
+  const [testForm, setTestForm] = useState({
+    email: '',
+    zodiacSign: 'aries',
+    birthDate: '',
+    birthTime: '',
+    plan: 'basic',
+    sendNow: true,
+  });
 
   const locale = language === 'sr' ? 'sr-RS' : language;
+  const timezone = typeof Intl !== 'undefined'
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : undefined;
+  const zodiacOptions = [
+    'aries',
+    'taurus',
+    'gemini',
+    'cancer',
+    'leo',
+    'virgo',
+    'libra',
+    'scorpio',
+    'sagittarius',
+    'capricorn',
+    'aquarius',
+    'pisces',
+  ];
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -110,6 +147,67 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
       ? (language === 'sr' ? 'Premium' : 'Premium')
       : (language === 'sr' ? 'Osnovni' : 'Basic');
 
+  const handleCreateTestSubscription = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!testForm.email.trim() || !testForm.birthDate) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Email i datum rođenja su obavezni.'
+          : 'Email and birth date are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingTest(true);
+    try {
+      const { sent } = await createTestHoroscopeSubscription({
+        email: testForm.email.trim(),
+        zodiac_sign: testForm.zodiacSign,
+        birth_date: testForm.birthDate,
+        birth_time: testForm.birthTime || null,
+        plan: testForm.plan as 'basic' | 'premium',
+        language,
+        timezone,
+        send_now: testForm.sendNow,
+      });
+
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr'
+          ? sent
+            ? 'Test pretplata je kreirana i poslata odmah.'
+            : 'Test pretplata je kreirana.'
+          : sent
+            ? 'Test subscription created and sent.'
+            : 'Test subscription created.',
+      });
+
+      setTestForm({
+        email: '',
+        zodiacSign: 'aries',
+        birthDate: '',
+        birthTime: '',
+        plan: 'basic',
+        sendNow: true,
+      });
+      setShowTestForm(false);
+      fetchData();
+    } catch (error) {
+      console.error('Failed to create test subscription:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće napraviti test pretplatu.'
+          : 'Could not create test subscription.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingTest(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -130,6 +228,114 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
             </Button>
           </div>
         </DialogHeader>
+
+        <div className="border border-border rounded-lg p-4 mb-6 bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="text-sm font-semibold text-foreground">
+              {language === 'sr' ? 'Test pretplata' : 'Test subscription'}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTestForm((prev) => !prev)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {showTestForm
+                ? (language === 'sr' ? 'Sakrij' : 'Hide')
+                : (language === 'sr' ? 'Dodaj' : 'Add')}
+            </Button>
+          </div>
+          {showTestForm && (
+            <form onSubmit={handleCreateTestSubscription} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {language === 'sr' ? 'Email' : 'Email'}
+                </label>
+                <Input
+                  type="email"
+                  value={testForm.email}
+                  onChange={(event) => setTestForm((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder="email@example.com"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {language === 'sr' ? 'Plan' : 'Plan'}
+                </label>
+                <Select
+                  value={testForm.plan}
+                  onValueChange={(value) => setTestForm((prev) => ({ ...prev, plan: value }))}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">{language === 'sr' ? 'Osnovni' : 'Basic'}</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {language === 'sr' ? 'Znak' : 'Sign'}
+                </label>
+                <Select
+                  value={testForm.zodiacSign}
+                  onValueChange={(value) => setTestForm((prev) => ({ ...prev, zodiacSign: value }))}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {zodiacOptions.map((signKey) => (
+                      <SelectItem key={signKey} value={signKey}>
+                        {getZodiacLabel(signKey)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {language === 'sr' ? 'Datum rođenja' : 'Birth date'}
+                </label>
+                <Input
+                  type="date"
+                  value={testForm.birthDate}
+                  onChange={(event) => setTestForm((prev) => ({ ...prev, birthDate: event.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">
+                  {language === 'sr' ? 'Vreme rođenja' : 'Birth time'}
+                </label>
+                <Input
+                  type="time"
+                  value={testForm.birthTime}
+                  onChange={(event) => setTestForm((prev) => ({ ...prev, birthTime: event.target.value }))}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-6">
+                <Checkbox
+                  checked={testForm.sendNow}
+                  onCheckedChange={(checked) =>
+                    setTestForm((prev) => ({ ...prev, sendNow: Boolean(checked) }))
+                  }
+                />
+                <span className="text-sm text-muted-foreground">
+                  {language === 'sr' ? 'Pošalji odmah' : 'Send now'}
+                </span>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button type="submit" disabled={isCreatingTest}>
+                  {language === 'sr' ? 'Kreiraj test' : 'Create test'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
           <div className="p-4 bg-card border border-border rounded-lg">
