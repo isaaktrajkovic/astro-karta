@@ -272,7 +272,9 @@ const requireAuth = (req, res, next) => {
 };
 
 const sendResendEmail = async ({ to, subject, html }) => {
-  if (!resendApiKey || !resendFromEmail) return;
+  if (!resendApiKey || !resendFromEmail) {
+    return { ok: false, error: 'Resend not configured' };
+  }
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -289,12 +291,26 @@ const sendResendEmail = async ({ to, subject, html }) => {
       }),
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Resend API error:', response.status, errorText);
+      console.error('Resend API error:', response.status, responseText);
+      return { ok: false, error: responseText || response.statusText };
     }
+
+    let responseJson = null;
+    if (responseText) {
+      try {
+        responseJson = JSON.parse(responseText);
+      } catch {
+        responseJson = null;
+      }
+    }
+
+    return { ok: true, id: responseJson?.id };
   } catch (error) {
     console.error('Resend request failed:', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Resend request failed' };
   }
 };
 
@@ -739,11 +755,47 @@ const sendDailyHoroscopeEmail = async ({
     </div>
   `;
 
-  await sendResendEmail({
+  return sendResendEmail({
     to: email,
     subject: `${copy.subject} · ${signLabel}`,
     html,
   });
+};
+
+const logHoroscopeDelivery = async ({
+  subscriptionId,
+  email,
+  zodiacSign,
+  horoscopeDate,
+  status,
+  providerId,
+  errorMessage,
+}) => {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO horoscope_delivery_log (
+        subscription_id,
+        email,
+        zodiac_sign,
+        horoscope_date,
+        status,
+        provider_id,
+        error_message
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        String(subscriptionId),
+        email,
+        zodiacSign,
+        horoscopeDate,
+        status,
+        providerId || null,
+        errorMessage || null,
+      ]
+    );
+  } catch (error) {
+    console.error('Failed to log horoscope delivery:', error);
+  }
 };
 
 async function createHoroscopeSubscription({
@@ -871,6 +923,14 @@ const dispatchDailyHoroscopes = async () => {
           dateLabel,
         });
         if (!horoscope) {
+          await logHoroscopeDelivery({
+            subscriptionId: subscription.id,
+            email: subscription.email,
+            zodiacSign: subscription.zodiac_sign,
+            horoscopeDate,
+            status: 'failed',
+            errorMessage: 'horoscope_generation_failed',
+          });
           continue;
         }
         cache.set(cacheKey, horoscope);
@@ -880,7 +940,7 @@ const dispatchDailyHoroscopes = async () => {
       const dateLabel = getLocalizedDateLabel(sendAt, timezone, language);
       const unsubscribeUrl = `${apiBaseUrl}/api/horoscope/unsubscribe?token=${subscription.unsubscribe_token}`;
 
-      await sendDailyHoroscopeEmail({
+      const sendResult = await sendDailyHoroscopeEmail({
         email: subscription.email,
         firstName: subscription.first_name,
         signLabel,
@@ -889,6 +949,20 @@ const dispatchDailyHoroscopes = async () => {
         unsubscribeUrl,
         language,
       });
+
+      await logHoroscopeDelivery({
+        subscriptionId: subscription.id,
+        email: subscription.email,
+        zodiacSign: subscription.zodiac_sign,
+        horoscopeDate,
+        status: sendResult?.ok ? 'sent' : 'failed',
+        providerId: sendResult?.id,
+        errorMessage: sendResult?.ok ? null : sendResult?.error || 'send_failed',
+      });
+
+      if (!sendResult?.ok) {
+        continue;
+      }
 
       const updatedSendCount = sendCount + 1;
       const completed = updatedSendCount >= horoscopeDurationDays;
@@ -1261,6 +1335,72 @@ app.get('/api/usage', requireAuth, async (_req, res) => {
   }
 });
 
+app.get('/api/horoscope/subscriptions', requireAuth, async (_req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        id,
+        order_id,
+        email,
+        first_name,
+        last_name,
+        zodiac_sign,
+        language,
+        timezone,
+        status,
+        start_at,
+        end_at,
+        next_send_at,
+        last_sent_at,
+        send_count,
+        unsubscribed_at,
+        created_at
+      FROM horoscope_subscriptions
+      ORDER BY created_at DESC`
+    );
+    return res.json({ subscriptions: rows });
+  } catch (error) {
+    console.error('Failed to fetch horoscope subscriptions:', error);
+    return res.status(500).json({ error: 'Failed to fetch subscriptions' });
+  }
+});
+
+app.get('/api/horoscope/deliveries', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const requestedLimit = Number(req.query.limit || 200);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 200;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        id,
+        subscription_id,
+        email,
+        zodiac_sign,
+        horoscope_date,
+        status,
+        provider_id,
+        error_message,
+        created_at
+      FROM horoscope_delivery_log
+      ORDER BY created_at DESC
+      LIMIT $1`,
+      [limit]
+    );
+    return res.json({ deliveries: rows });
+  } catch (error) {
+    console.error('Failed to fetch horoscope deliveries:', error);
+    return res.status(500).json({ error: 'Failed to fetch deliveries' });
+  }
+});
+
 app.get('/api/horoscope/unsubscribe', async (req, res) => {
   if (!pool) {
     return res.status(500).send('Database not configured');
@@ -1274,7 +1414,7 @@ app.get('/api/horoscope/unsubscribe', async (req, res) => {
   try {
     const { rowCount } = await pool.query(
       `UPDATE horoscope_subscriptions
-       SET status = 'unsubscribed', next_send_at = NULL
+       SET status = 'unsubscribed', next_send_at = NULL, unsubscribed_at = NOW()
        WHERE unsubscribe_token = $1`,
       [token]
     );

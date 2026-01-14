@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   last_sent_at TIMESTAMP NULL DEFAULT NULL,
   send_count INT NOT NULL DEFAULT 0,
   unsubscribe_token VARCHAR(128) NOT NULL UNIQUE,
+  unsubscribed_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,4 +67,18 @@ CREATE TABLE IF NOT EXISTS daily_horoscopes (
   UNIQUE KEY daily_horoscopes_unique (horoscope_date, zodiac_sign, language)
 );
 
+CREATE TABLE IF NOT EXISTS horoscope_delivery_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subscription_id VARCHAR(64) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  zodiac_sign VARCHAR(32) NOT NULL,
+  horoscope_date DATE NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  provider_id VARCHAR(128) NULL,
+  error_message TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX horoscope_subscriptions_due_idx ON horoscope_subscriptions (status, next_send_at);
+CREATE INDEX horoscope_delivery_log_date_idx ON horoscope_delivery_log (horoscope_date);
+CREATE INDEX horoscope_delivery_log_subscription_idx ON horoscope_delivery_log (subscription_id);

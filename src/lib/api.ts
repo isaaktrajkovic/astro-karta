@@ -25,11 +25,47 @@ export interface Order {
   created_at: string;
 }
 
+export type CreateOrderPayload = Omit<Order, 'id' | 'status' | 'created_at'> & {
+  language?: string;
+  timezone?: string;
+};
+
 export interface CalculatorUsage {
   id: number;
   sign1: string;
   sign2: string;
   compatibility: number;
+  created_at: string;
+}
+
+export interface HoroscopeSubscription {
+  id: string;
+  order_id: string | null;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  zodiac_sign: string;
+  language: string;
+  timezone: string;
+  status: string;
+  start_at: string;
+  end_at: string;
+  next_send_at: string | null;
+  last_sent_at: string | null;
+  send_count: number;
+  unsubscribed_at: string | null;
+  created_at: string;
+}
+
+export interface HoroscopeDeliveryLog {
+  id: string;
+  subscription_id: string;
+  email: string;
+  zodiac_sign: string;
+  horoscope_date: string;
+  status: string;
+  provider_id: string | null;
+  error_message: string | null;
   created_at: string;
 }
 
@@ -131,7 +167,7 @@ export const updateOrderStatus = (orderId: number, status: string) =>
     body: JSON.stringify({ status }),
   });
 
-export const createOrder = (payload: Omit<Order, 'id' | 'status' | 'created_at'>) =>
+export const createOrder = (payload: CreateOrderPayload) =>
   request<{ success: true; orderId: number }>('/api/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -147,4 +183,16 @@ export const trackUsage = (payload: Pick<CalculatorUsage, 'sign1' | 'sign2' | 'c
   request<{ success: true }>('/api/usage', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+
+export const getHoroscopeSubscriptions = () =>
+  request<{ subscriptions: HoroscopeSubscription[] }>('/api/horoscope/subscriptions', {
+    method: 'GET',
+    auth: true,
+  });
+
+export const getHoroscopeDeliveries = (limit = 200) =>
+  request<{ deliveries: HoroscopeDeliveryLog[] }>(`/api/horoscope/deliveries?limit=${limit}`, {
+    method: 'GET',
+    auth: true,
   });

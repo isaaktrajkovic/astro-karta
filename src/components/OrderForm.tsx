@@ -36,6 +36,9 @@ type PreviewData = {
 
 const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }: OrderFormProps) => {
   const { t, language } = useLanguage();
+  const timezone = typeof Intl !== 'undefined'
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : undefined;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileDateInput, setIsMobileDateInput] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
@@ -206,6 +209,8 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       email: formData.email,
       note: fullNote || null,
       consultation_description: isConsultation ? formData.consultationDescription : null,
+      language,
+      timezone,
     };
 
     const preview: PreviewData = {

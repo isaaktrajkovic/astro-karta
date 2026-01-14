@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
+import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
 import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus } from '@/lib/api';
 import {
   Select,
@@ -70,6 +71,7 @@ const Dashboard = () => {
   const [zodiacFilter, setZodiacFilter] = useState<ZodiacSign>('all');
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [usageDialogOpen, setUsageDialogOpen] = useState(false);
+  const [horoscopeDialogOpen, setHoroscopeDialogOpen] = useState(false);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -407,7 +409,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats - Clickable */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
           <StatCard
             count={orders.length}
             label={language === 'sr' ? 'Ukupno narudžbina' : 'Total Orders'}
@@ -440,6 +442,20 @@ const Dashboard = () => {
             <div className="text-3xl font-bold mb-2 text-primary">{calculatorUsageCount}</div>
             <div className="text-sm text-muted-foreground">
               {language === 'sr' ? 'Korišćenje kalkulatora' : 'Calculator Usage'}
+            </div>
+          </button>
+          <button
+            onClick={() => setHoroscopeDialogOpen(true)}
+            className="bg-card p-6 rounded-xl border border-border hover:border-primary/50 transition-all text-left w-full"
+          >
+            <div className="flex items-center gap-2 text-primary mb-2">
+              <Sparkles className="w-6 h-6" />
+              <div className="text-2xl font-bold">
+                {language === 'sr' ? 'Horoskop' : 'Horoscope'}
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {language === 'sr' ? 'Dnevna slanja' : 'Daily sends'}
             </div>
           </button>
         </div>
@@ -619,6 +635,10 @@ const Dashboard = () => {
         <CalculatorUsageDialog 
           open={usageDialogOpen} 
           onOpenChange={setUsageDialogOpen} 
+        />
+        <HoroscopeAdminDialog
+          open={horoscopeDialogOpen}
+          onOpenChange={setHoroscopeDialogOpen}
         />
       </div>
     </div>
