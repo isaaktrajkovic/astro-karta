@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
-import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus, deleteOrders } from '@/lib/api';
+import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus, deleteOrders, sendOrderReport } from '@/lib/api';
 import {
   Select,
   SelectContent,
@@ -16,6 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 type Order = ApiOrder;
 
@@ -74,6 +85,11 @@ const Dashboard = () => {
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [usageDialogOpen, setUsageDialogOpen] = useState(false);
   const [horoscopeDialogOpen, setHoroscopeDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportOrder, setReportOrder] = useState<Order | null>(null);
+  const [reportSubject, setReportSubject] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportIsSending, setReportIsSending] = useState(false);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -123,6 +139,97 @@ const Dashboard = () => {
         description: language === 'sr' ? 'Nije moguće ažurirati status' : 'Could not update status',
         variant: 'destructive',
       });
+    }
+  };
+
+  const getDefaultReportSubject = (orderLanguage: string | null, productName: string) => {
+    switch (orderLanguage) {
+      case 'en':
+        return `Your report is ready - ${productName}`;
+      case 'fr':
+        return `Votre rapport est prêt - ${productName}`;
+      case 'de':
+        return `Ihr Bericht ist bereit - ${productName}`;
+      case 'es':
+        return `Tu informe está listo - ${productName}`;
+      case 'ru':
+        return `Ваш отчет готов - ${productName}`;
+      case 'sr':
+      default:
+        return `Vaš izveštaj je spreman - ${productName}`;
+    }
+  };
+
+  const handleOpenReportDialog = (order: Order) => {
+    setReportOrder(order);
+    setReportSubject(getDefaultReportSubject(order.language || 'sr', order.product_name));
+    setReportMessage('');
+    setReportDialogOpen(true);
+  };
+
+  const handleReportDialogChange = (open: boolean) => {
+    setReportDialogOpen(open);
+    if (!open) {
+      setReportOrder(null);
+      setReportSubject('');
+      setReportMessage('');
+      setReportIsSending(false);
+    }
+  };
+
+  const handleSendReport = async () => {
+    if (!reportOrder) return;
+    const trimmedMessage = reportMessage.trim();
+    if (!trimmedMessage) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr' ? 'Unesite tekst izveštaja.' : 'Please enter the report text.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setReportIsSending(true);
+    try {
+      const response = await sendOrderReport(reportOrder.id, {
+        subject: reportSubject.trim() || undefined,
+        message: trimmedMessage,
+        language: reportOrder.language || language,
+      });
+
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr' ? 'Email je poslat.' : 'Email has been sent.',
+      });
+
+      if (response.statusUpdated !== false) {
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === reportOrder.id ? { ...order, status: 'completed' } : order
+          )
+        );
+      } else {
+        toast({
+          title: language === 'sr' ? 'Upozorenje' : 'Warning',
+          description: language === 'sr'
+            ? 'Email je poslat, ali status nije automatski ažuriran.'
+            : 'Email was sent, but the status was not updated automatically.',
+          variant: 'destructive',
+        });
+      }
+
+      handleReportDialogChange(false);
+    } catch (error) {
+      console.error('Error sending report:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr' ? 'Slanje nije uspelo.' : 'Failed to send report.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setReportIsSending(false);
     }
   };
 
@@ -606,6 +713,9 @@ const Dashboard = () => {
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                       {language === 'sr' ? 'Datum' : 'Date'}
                     </th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">
+                      {language === 'sr' ? 'Akcije' : 'Actions'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -715,6 +825,16 @@ const Dashboard = () => {
                           minute: '2-digit',
                         })}
                       </td>
+                      <td className="p-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenReportDialog(order)}
+                          title={language === 'sr' ? 'Pošalji izveštaj' : 'Send report'}
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -731,6 +851,86 @@ const Dashboard = () => {
           open={horoscopeDialogOpen}
           onOpenChange={setHoroscopeDialogOpen}
         />
+        <Dialog open={reportDialogOpen} onOpenChange={handleReportDialogChange}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="w-5 h-5 text-primary" />
+                {language === 'sr' ? 'Pošalji izveštaj' : 'Send report'}
+              </DialogTitle>
+              <DialogDescription>
+                {language === 'sr'
+                  ? 'Poruka će biti poslata u istom formatu kao dnevni horoskop.'
+                  : 'The message will be sent in the same format as the daily horoscope.'}
+              </DialogDescription>
+            </DialogHeader>
+
+            {reportOrder ? (
+              <div className="rounded-lg border border-border bg-card/40 p-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">
+                    {language === 'sr' ? 'Prima' : 'Recipient'}
+                  </span>
+                  <span className="text-foreground">{reportOrder.email}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">
+                    {language === 'sr' ? 'Proizvod' : 'Product'}
+                  </span>
+                  <span className="text-foreground">{reportOrder.product_name}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">
+                    {language === 'sr' ? 'Jezik kupca' : 'Customer language'}
+                  </span>
+                  <span className="text-foreground">{reportOrder.language || 'sr'}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-card/40 p-4 text-sm text-muted-foreground">
+                {language === 'sr' ? 'Porudžbina nije izabrana.' : 'No order selected.'}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="report-subject">{language === 'sr' ? 'Naslov' : 'Subject'}</Label>
+                <Input
+                  id="report-subject"
+                  value={reportSubject}
+                  onChange={(event) => setReportSubject(event.target.value)}
+                  placeholder={language === 'sr' ? 'Unesite naslov emaila' : 'Enter email subject'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="report-message">{language === 'sr' ? 'Tekst izveštaja' : 'Report text'}</Label>
+                <Textarea
+                  id="report-message"
+                  value={reportMessage}
+                  onChange={(event) => setReportMessage(event.target.value)}
+                  rows={8}
+                  placeholder={language === 'sr'
+                    ? 'Napišite izveštaj. Prazan red pravi novi paragraf.'
+                    : 'Write the report. Leave a blank line to start a new paragraph.'}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => handleReportDialogChange(false)}>
+                {language === 'sr' ? 'Otkaži' : 'Cancel'}
+              </Button>
+              <Button
+                variant="cosmic"
+                onClick={handleSendReport}
+                disabled={reportIsSending || !reportOrder}
+              >
+                {reportIsSending ? (language === 'sr' ? 'Slanje...' : 'Sending...') : (language === 'sr' ? 'Pošalji' : 'Send')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

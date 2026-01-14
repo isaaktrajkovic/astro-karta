@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS orders (
   gender ENUM('male', 'female', 'unspecified') NOT NULL DEFAULT 'unspecified',
   note TEXT NULL,
   consultation_description TEXT NULL,
+  language VARCHAR(8) NOT NULL DEFAULT 'sr',
   status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -475,6 +475,53 @@ const sendOrderNotifications = async ({
   });
 };
 
+const sendManualReportEmail = async ({
+  email,
+  firstName,
+  productName,
+  subject,
+  message,
+  language,
+}) => {
+  const copy = getManualReportEmailCopy(language);
+  const greetingName = firstName ? ` ${firstName}` : '';
+  const intro = formatOrderTemplate(copy.intro, { product: productName });
+  const subjectLine = formatPlainTemplate(copy.subject, { product: productName });
+  const trimmedSubject = String(subject || '').trim();
+  const finalSubject = trimmedSubject || subjectLine;
+
+  const paragraphs = String(message || '')
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const body = paragraphs.length
+    ? paragraphs
+        .map((paragraph) => {
+          const withBreaks = escapeHtml(paragraph).replace(/\n/g, '<br />');
+          return `<p style="margin: 0 0 10px;">${withBreaks}</p>`;
+        })
+        .join('')
+    : '<p style="margin: 0;">-</p>';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #e8e4ff; background-color: #0b0a13;">
+      <h1 style="font-size: 22px; margin: 0 0 8px;">${escapeHtml(copy.greeting)}${escapeHtml(greetingName)}</h1>
+      <p style="margin: 0 0 16px; color: #b7b0d9;">${intro}</p>
+      <div style="background: #171429; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        ${body}
+      </div>
+      <p style="margin: 0 0 12px; color: #b7b0d9;">${escapeHtml(copy.outro)}</p>
+      <p style="margin: 0; font-size: 12px; color: #8a82b8;">${escapeHtml(copy.footer)}</p>
+    </div>
+  `;
+
+  return sendResendEmail({
+    to: email,
+    subject: finalSubject,
+    html,
+  });
+};
+
 const horoscopeSubscriptionPlans = new Map([
   ['monthly-basic', 'basic'],
   ['monthly-premium', 'premium'],
@@ -632,6 +679,9 @@ const escapeHtml = (value) =>
 const formatOrderTemplate = (template, values) =>
   String(template || '').replace(/\{(\w+)\}/g, (_match, key) => escapeHtml(values?.[key] ?? ''));
 
+const formatPlainTemplate = (template, values) =>
+  String(template || '').replace(/\{(\w+)\}/g, (_match, key) => String(values?.[key] ?? ''));
+
 const getOrderEmailCopy = (language) => {
   const normalized = getSupportedLanguage(language);
   const copy = {
@@ -730,6 +780,55 @@ const getOrderEmailCopy = (language) => {
       signOffLine1: 'С уважением,',
       signOffLine2: 'Команда Astro Portal',
       footer: 'Это сообщение отправлено автоматически. Если у вас есть вопросы, ответьте на это письмо.',
+    },
+  };
+  return copy[normalized] || copy.sr;
+};
+
+const getManualReportEmailCopy = (language) => {
+  const normalized = getSupportedLanguage(language);
+  const copy = {
+    sr: {
+      subject: 'Vaš izveštaj je spreman - {product}',
+      greeting: 'Zdravo',
+      intro: 'Vaš izveštaj za {product} je spreman.',
+      outro: 'Ako imate pitanja, slobodno odgovorite na ovaj email.',
+      footer: 'Ova poruka je automatski poslata.',
+    },
+    en: {
+      subject: 'Your report is ready - {product}',
+      greeting: 'Hello',
+      intro: 'Your report for {product} is ready.',
+      outro: 'If you have questions, feel free to reply to this email.',
+      footer: 'This message was sent automatically.',
+    },
+    fr: {
+      subject: 'Votre rapport est prêt - {product}',
+      greeting: 'Bonjour',
+      intro: 'Votre rapport pour {product} est prêt.',
+      outro: 'Si vous avez des questions, n’hésitez pas à répondre à cet email.',
+      footer: 'Ce message a été envoyé automatiquement.',
+    },
+    de: {
+      subject: 'Ihr Bericht ist bereit - {product}',
+      greeting: 'Hallo',
+      intro: 'Ihr Bericht für {product} ist bereit.',
+      outro: 'Wenn Sie Fragen haben, antworten Sie gerne auf diese E-Mail.',
+      footer: 'Diese Nachricht wurde automatisch gesendet.',
+    },
+    es: {
+      subject: 'Tu informe está listo - {product}',
+      greeting: 'Hola',
+      intro: 'Tu informe para {product} está listo.',
+      outro: 'Si tienes preguntas, responde a este correo.',
+      footer: 'Este mensaje se envió automáticamente.',
+    },
+    ru: {
+      subject: 'Ваш отчет готов - {product}',
+      greeting: 'Здравствуйте',
+      intro: 'Ваш отчет по {product} готов.',
+      outro: 'Если у вас есть вопросы, ответьте на это письмо.',
+      footer: 'Это сообщение отправлено автоматически.',
     },
   };
   return copy[normalized] || copy.sr;
@@ -1463,6 +1562,7 @@ app.post('/api/orders', async (req, res) => {
 
   const normalizedBirthTime = String(birth_time || '').trim();
   const normalizedGender = normalizeGender(gender);
+  const normalizedLanguage = getSupportedLanguage(language);
 
   if (
     !product_id ||
@@ -1496,8 +1596,9 @@ app.post('/api/orders', async (req, res) => {
       email,
       gender,
       note,
-      consultation_description
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      consultation_description,
+      language
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id`,
       [
         product_id,
@@ -1514,6 +1615,7 @@ app.post('/api/orders', async (req, res) => {
         normalizedGender,
         note || null,
         consultation_description || null,
+        normalizedLanguage,
       ]
     );
 
@@ -1525,7 +1627,7 @@ app.post('/api/orders', async (req, res) => {
       birthPlace: birth_place,
       birthTime: normalizedBirthTime,
       note,
-      language,
+      language: normalizedLanguage,
     });
 
     const plan = horoscopeSubscriptionPlans.get(product_id);
@@ -1539,7 +1641,7 @@ app.post('/api/orders', async (req, res) => {
           birthDate: birth_date,
           birthTime: normalizedBirthTime,
           gender: normalizedGender,
-          language,
+          language: normalizedLanguage,
           timezone,
           plan,
           sendNow: true,
@@ -1596,6 +1698,7 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
         gender,
         note,
         consultation_description,
+        language,
         status,
         created_at
       FROM orders
@@ -1660,6 +1763,64 @@ app.patch('/api/orders/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Failed to update order:', error);
     return res.status(500).json({ error: 'Failed to update order' });
+  }
+});
+
+app.post('/api/orders/:id/send-report', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+
+  const { subject, message, language } = req.body || {};
+  const trimmedMessage = String(message || '').trim();
+  if (!trimmedMessage) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, first_name, product_name, language
+       FROM orders
+       WHERE id = $1
+       LIMIT 1`,
+      [orderId]
+    );
+    const order = rows[0];
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const normalizedLanguage = getSupportedLanguage(order.language || language);
+    const sendResult = await sendManualReportEmail({
+      email: order.email,
+      firstName: order.first_name,
+      productName: order.product_name,
+      subject,
+      message: trimmedMessage,
+      language: normalizedLanguage,
+    });
+
+    if (!sendResult?.ok) {
+      return res.status(500).json({ error: sendResult?.error || 'Failed to send report' });
+    }
+
+    let statusUpdated = true;
+    try {
+      await pool.query('UPDATE orders SET status = $1 WHERE id = $2', ['completed', orderId]);
+    } catch (statusError) {
+      statusUpdated = false;
+      console.error('Failed to update order status after report send:', statusError);
+    }
+
+    return res.json({ success: true, statusUpdated });
+  } catch (error) {
+    console.error('Failed to send report:', error);
+    return res.status(500).json({ error: 'Failed to send report' });
   }
 });
 

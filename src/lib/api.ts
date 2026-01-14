@@ -22,6 +22,7 @@ export interface Order {
   gender: string | null;
   note: string | null;
   consultation_description: string | null;
+  language: string | null;
   status: string;
   created_at: string;
 }
@@ -195,6 +196,16 @@ export const deleteOrders = (orderIds: number[]) =>
 export const createOrder = (payload: CreateOrderPayload) =>
   request<{ success: true; orderId: number }>('/api/orders', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const sendOrderReport = (
+  orderId: number,
+  payload: { subject?: string; message: string; language?: string }
+) =>
+  request<{ success: true; statusUpdated?: boolean }>(`/api/orders/${orderId}/send-report`, {
+    method: 'POST',
+    auth: true,
     body: JSON.stringify(payload),
   });
 

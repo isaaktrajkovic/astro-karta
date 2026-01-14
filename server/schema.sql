@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS orders (
   gender TEXT NOT NULL DEFAULT 'unspecified',
   note TEXT NULL,
   consultation_description TEXT NULL,
+  language TEXT NOT NULL DEFAULT 'sr',
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT orders_status_check CHECK (status IN ('pending', 'processing', 'completed', 'cancelled')),
