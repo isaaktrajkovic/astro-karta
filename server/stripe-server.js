@@ -610,6 +610,110 @@ app.get('/api/usage', requireAuth, async (_req, res) => {
   }
 });
 
+const zodiacLabelsByLanguage = {
+  sr: {
+    aries: 'Ovan',
+    taurus: 'Bik',
+    gemini: 'Blizanci',
+    cancer: 'Rak',
+    leo: 'Lav',
+    virgo: 'Devica',
+    libra: 'Vaga',
+    scorpio: 'Škorpija',
+    sagittarius: 'Strelac',
+    capricorn: 'Jarac',
+    aquarius: 'Vodolija',
+    pisces: 'Ribe',
+  },
+  en: {
+    aries: 'Aries',
+    taurus: 'Taurus',
+    gemini: 'Gemini',
+    cancer: 'Cancer',
+    leo: 'Leo',
+    virgo: 'Virgo',
+    libra: 'Libra',
+    scorpio: 'Scorpio',
+    sagittarius: 'Sagittarius',
+    capricorn: 'Capricorn',
+    aquarius: 'Aquarius',
+    pisces: 'Pisces',
+  },
+  fr: {
+    aries: 'Bélier',
+    taurus: 'Taureau',
+    gemini: 'Gémeaux',
+    cancer: 'Cancer',
+    leo: 'Lion',
+    virgo: 'Vierge',
+    libra: 'Balance',
+    scorpio: 'Scorpion',
+    sagittarius: 'Sagittaire',
+    capricorn: 'Capricorne',
+    aquarius: 'Verseau',
+    pisces: 'Poissons',
+  },
+  de: {
+    aries: 'Widder',
+    taurus: 'Stier',
+    gemini: 'Zwillinge',
+    cancer: 'Krebs',
+    leo: 'Löwe',
+    virgo: 'Jungfrau',
+    libra: 'Waage',
+    scorpio: 'Skorpion',
+    sagittarius: 'Schütze',
+    capricorn: 'Steinbock',
+    aquarius: 'Wassermann',
+    pisces: 'Fische',
+  },
+  es: {
+    aries: 'Aries',
+    taurus: 'Tauro',
+    gemini: 'Géminis',
+    cancer: 'Cáncer',
+    leo: 'Leo',
+    virgo: 'Virgo',
+    libra: 'Libra',
+    scorpio: 'Escorpio',
+    sagittarius: 'Sagitario',
+    capricorn: 'Capricornio',
+    aquarius: 'Acuario',
+    pisces: 'Piscis',
+  },
+  ru: {
+    aries: 'Овен',
+    taurus: 'Телец',
+    gemini: 'Близнецы',
+    cancer: 'Рак',
+    leo: 'Лев',
+    virgo: 'Дева',
+    libra: 'Весы',
+    scorpio: 'Скорпион',
+    sagittarius: 'Стрелец',
+    capricorn: 'Козерог',
+    aquarius: 'Водолей',
+    pisces: 'Рыбы',
+  },
+};
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const hasExactSign = (text, signLabel) => {
+  if (!text || !signLabel) return false;
+  const pattern = new RegExp(`(^|[^\\p{L}])${escapeRegex(signLabel)}([^\\p{L}]|$)`, 'iu');
+  return pattern.test(text);
+};
+
+const validateSignMentions = (text, sign1Label, sign2Label, signLabels) => {
+  if (!text) return false;
+  if (!hasExactSign(text, sign1Label) || !hasExactSign(text, sign2Label)) {
+    return false;
+  }
+  const mentioned = signLabels.filter((label) => hasExactSign(text, label));
+  return mentioned.every((label) => label === sign1Label || label === sign2Label);
+};
+
 // LLM endpoint for compatibility copy
 app.post('/api/compatibility-llm', llmLimiter, async (req, res) => {
   if (!openai) {
@@ -631,11 +735,15 @@ app.post('/api/compatibility-llm', llmLimiter, async (req, res) => {
     ru: 'Russian',
   };
   const languageLabel = languageMap[language] || 'Serbian (Latin script)';
+  const signLabels = zodiacLabelsByLanguage[language] || zodiacLabelsByLanguage.sr;
+  const sign1Label = signLabels?.[sign1] || sign1;
+  const sign2Label = signLabels?.[sign2] || sign2;
 
   const prompt = `
 You are an astrologer copywriter. Write ONE short paragraph (max 80 words) in ${languageLabel}.
 Respond ONLY in ${languageLabel}.
-About the couple ${sign1} & ${sign2} with compatibility ${compatibility}%.
+Use EXACT sign names: "${sign1Label}" and "${sign2Label}". Do not mention any other zodiac sign names.
+About the couple ${sign1Label} & ${sign2Label} with compatibility ${compatibility}%.
 Mention 1-2 key traits for each sign and 1 clear reason why they match or complement each other.
 Vary vocabulary each time; make it warm, intriguing, and end with a soft CTA to order the full paid analysis.
 No lists, no headings—just a single paragraph.`;
@@ -643,8 +751,8 @@ No lists, no headings—just a single paragraph.`;
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      temperature: 0.95,
-      max_tokens: 150,
+      temperature: 0.35,
+      max_tokens: 120,
       messages: [
         { role: 'system', content: `Stay concise, 1 paragraph, persuasive but authentic. Use ${languageLabel} only.` },
         { role: 'user', content: prompt },
@@ -652,6 +760,10 @@ No lists, no headings—just a single paragraph.`;
     });
 
     const text = completion.choices?.[0]?.message?.content?.trim();
+    const allSignLabels = Object.values(signLabels || {});
+    if (!validateSignMentions(text, sign1Label, sign2Label, allSignLabels)) {
+      return res.json({ text: null });
+    }
     return res.json({ text });
   } catch (err) {
     console.error('LLM error', err);

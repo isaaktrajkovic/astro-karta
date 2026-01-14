@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,6 +139,7 @@ const CompatibilityCalculator = () => {
   const maxDate = new Date().toISOString().split('T')[0];
   const [isLoadingDescription, setIsLoadingDescription] = useState(false);
   const [isMobileDateInput, setIsMobileDateInput] = useState(false);
+  const llmRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -162,7 +163,6 @@ const CompatibilityCalculator = () => {
     if (!llmEnabled) {
       return null;
     }
-    setIsLoadingDescription(true);
     try {
       const response = await fetch(`${apiBase}/api/compatibility-llm`, {
         method: 'POST',
@@ -175,16 +175,14 @@ const CompatibilityCalculator = () => {
       }
 
       const data = await response.json();
-      return data.text as string;
+      return typeof data.text === 'string' ? data.text : null;
     } catch (error) {
       console.error('LLM description error:', error);
       return null;
-    } finally {
-      setIsLoadingDescription(false);
     }
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = () => {
     const parsedDate1 = parseDateString(date1, isMobileDateInput);
     const parsedDate2 = parseDateString(date2, isMobileDateInput);
     
@@ -194,21 +192,38 @@ const CompatibilityCalculator = () => {
     const sign2 = getZodiacSign(parsedDate2);
     const compatibility = getCompatibility(sign1.name, sign2.name);
 
-    const llmDescription = await fetchLlmDescription(sign1.name, sign2.name, compatibility);
-
-    // Track calculator usage
-    try {
-      await trackUsage({
-        sign1: sign1.name,
-        sign2: sign2.name,
-        compatibility: compatibility,
-      });
-    } catch (error) {
-      console.error('Error tracking calculator usage:', error);
-    }
-
-    setResult({ sign1, sign2, compatibility, llmDescription });
+    setResult({ sign1, sign2, compatibility, llmDescription: null });
     setShowResult(true);
+
+    // Track calculator usage without blocking the UI
+    trackUsage({
+      sign1: sign1.name,
+      sign2: sign2.name,
+      compatibility: compatibility,
+    }).catch((error) => {
+      console.error('Error tracking calculator usage:', error);
+    });
+
+    if (llmEnabled) {
+      const requestId = llmRequestIdRef.current + 1;
+      llmRequestIdRef.current = requestId;
+      setIsLoadingDescription(true);
+
+      fetchLlmDescription(sign1.name, sign2.name, compatibility)
+        .then((llmDescription) => {
+          if (!llmDescription || llmRequestIdRef.current !== requestId) {
+            return;
+          }
+          setResult((prev) => (prev ? { ...prev, llmDescription } : prev));
+        })
+        .finally(() => {
+          if (llmRequestIdRef.current === requestId) {
+            setIsLoadingDescription(false);
+          }
+        });
+    } else {
+      setIsLoadingDescription(false);
+    }
   };
 
   const isValidDate = (dateStr: string) => {
@@ -283,7 +298,7 @@ const CompatibilityCalculator = () => {
             variant="cosmic"
             size="xl"
             onClick={handleCalculate}
-            disabled={!canCalculate || isLoadingDescription}
+            disabled={!canCalculate}
             className="min-w-[200px]"
           >
             <Heart className="mr-2 h-5 w-5" />
