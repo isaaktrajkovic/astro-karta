@@ -13,11 +13,13 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { createOrder } from '@/lib/api';
+import { createOrder, validateReferralCode } from '@/lib/api';
+import { formatPrice } from '@/lib/utils';
 
 interface OrderFormProps {
   productId: string;
   productName: string;
+  basePriceCents: number;
   isConsultation?: boolean;
   onSuccess?: () => void;
 }
@@ -40,9 +42,15 @@ type PreviewData = {
     birthCity: string;
     birthCountry: string;
   };
+  referralCode?: string;
 };
 
-const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }: OrderFormProps) => {
+type AppliedReferral = {
+  code: string;
+  discountPercent: number;
+};
+
+const OrderForm = ({ productId, productName, basePriceCents, isConsultation = false, onSuccess }: OrderFormProps) => {
   const { t, language } = useLanguage();
   const timezone = typeof Intl !== 'undefined'
     ? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -51,9 +59,12 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
   const [isMobileDateInput, setIsMobileDateInput] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [referralInput, setReferralInput] = useState('');
+  const [appliedReferral, setAppliedReferral] = useState<AppliedReferral | null>(null);
+  const [referralStatus, setReferralStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   
   // Check if this is a compatibility/love analysis product
-  const isCompatibilityAnalysis = productId === 'report-love';
+  const isCompatibilityAnalysis = productId === 'report-love' || productId === 'report-synastry';
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -76,6 +87,73 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
   });
   const isTimeMissing = !formData.birthTime.trim()
     || (isCompatibilityAnalysis && !formData.partnerBirthTime.trim());
+  const appliedDiscountPercent = appliedReferral?.discountPercent || 0;
+  const discountAmountCents = Math.round((basePriceCents * appliedDiscountPercent) / 100);
+  const finalPriceCents = Math.max(basePriceCents - discountAmountCents, 0);
+
+  const handleApplyReferral = async () => {
+    const trimmed = referralInput.trim();
+    if (!trimmed) {
+      setAppliedReferral(null);
+      setReferralStatus('idle');
+      return;
+    }
+
+    setReferralStatus('loading');
+    try {
+      const response = await validateReferralCode(trimmed);
+      if (!response.valid) {
+        setAppliedReferral(null);
+        setReferralStatus('invalid');
+        return;
+      }
+      const normalizedCode = response.code || trimmed.toUpperCase();
+      const discountPercent = response.discountPercent ?? 0;
+      setAppliedReferral({ code: normalizedCode, discountPercent });
+      setReferralInput(normalizedCode);
+      setReferralStatus('valid');
+    } catch (error) {
+      console.error('Error validating referral:', error);
+      setAppliedReferral(null);
+      setReferralStatus('invalid');
+    }
+  };
+
+  const handleReferralInputChange = (value: string) => {
+    setReferralInput(value);
+    if (appliedReferral && value.trim().toUpperCase() !== appliedReferral.code) {
+      setAppliedReferral(null);
+      setReferralStatus('idle');
+    }
+  };
+
+  const renderPriceSummary = () => (
+    <div className="rounded-xl border border-border bg-card/60 p-4">
+      <h4 className="text-sm font-semibold text-foreground">
+        {language === 'sr' ? 'Cena' : 'Price'}
+      </h4>
+      <div className="mt-3 grid gap-2 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">
+            {language === 'sr' ? 'Osnovna cena' : 'Base price'}
+          </span>
+          <span className="text-foreground">{formatPrice(basePriceCents)}</span>
+        </div>
+        {appliedReferral && (
+          <div className="flex items-center justify-between text-emerald-400">
+            <span>
+              {language === 'sr' ? 'Popust' : 'Discount'} ({appliedDiscountPercent}%)
+            </span>
+            <span>-{formatPrice(discountAmountCents)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between font-semibold text-foreground">
+          <span>{language === 'sr' ? 'Ukupno' : 'Total'}</span>
+          <span>{formatPrice(finalPriceCents)}</span>
+        </div>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -100,7 +178,7 @@ const OrderForm = ({ productId, productName, isConsultation = false, onSuccess }
     const trimmed = value.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
-    const normalized = trimmed.replace(/[.\-]/g, '/');
+    const normalized = trimmed.replace(/[.-]/g, '/');
     const parts = normalized.split('/').map((part) => part.trim());
     if (parts.length !== 3) return null;
 
@@ -237,6 +315,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       consultation_description: isConsultation ? formData.consultationDescription : null,
       language,
       timezone,
+      referral_code: appliedReferral?.code || null,
     };
 
     const preview: PreviewData = {
@@ -249,6 +328,7 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       email: formData.email,
       note: formData.note,
       consultationDescription: formData.consultationDescription,
+      referralCode: appliedReferral?.code,
       partner: isCompatibilityAnalysis
         ? {
             firstName: formData.partnerFirstName,
@@ -302,6 +382,9 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
         partnerBirthCity: '',
         partnerBirthCountry: '',
       });
+      setReferralInput('');
+      setAppliedReferral(null);
+      setReferralStatus('idle');
       setIsPreview(false);
       setPreviewData(null);
 
@@ -347,6 +430,12 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
                 {renderPreviewRow(t('form.birthCity'), previewData?.birthCity || '')}
                 {renderPreviewRow(t('form.birthCountry'), previewData?.birthCountry || '')}
                 {renderPreviewRow(t('form.email'), previewData?.email || '')}
+                {previewData?.referralCode
+                  ? renderPreviewRow(
+                      language === 'sr' ? 'Referal kod' : 'Referral code',
+                      previewData.referralCode
+                    )
+                  : null}
               </div>
             </div>
 
@@ -379,6 +468,8 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
                 {previewData?.note?.trim() || '-'}
               </p>
             </div>
+
+            {renderPriceSummary()}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -663,6 +754,44 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
           )}
 
           <div className="space-y-2">
+            <Label htmlFor="referralCode" className="text-foreground">
+              {language === 'sr' ? 'Referal kod' : 'Referral code'}
+            </Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="referralCode"
+                type="text"
+                value={referralInput}
+                onChange={(e) => handleReferralInputChange(e.target.value)}
+                placeholder={language === 'sr' ? 'Unesite kod (opciono)' : 'Enter code (optional)'}
+                className="bg-secondary/50 border-border focus:border-primary"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleApplyReferral}
+                disabled={referralStatus === 'loading' || !referralInput.trim()}
+              >
+                {referralStatus === 'loading'
+                  ? (language === 'sr' ? 'Provera...' : 'Checking...')
+                  : (language === 'sr' ? 'Primeni' : 'Apply')}
+              </Button>
+            </div>
+            {referralStatus === 'valid' && appliedReferral && (
+              <p className="text-xs text-emerald-400">
+                {language === 'sr'
+                  ? `Popust ${appliedReferral.discountPercent}% je primenjen.`
+                  : `Applied ${appliedReferral.discountPercent}% discount.`}
+              </p>
+            )}
+            {referralStatus === 'invalid' && (
+              <p className="text-xs text-destructive">
+                {language === 'sr' ? 'Kod nije validan ili nije aktivan.' : 'Code is invalid or inactive.'}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="note" className="text-foreground">
               {t('form.note')}
             </Label>
@@ -674,6 +803,8 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
               className="bg-secondary/50 border-border focus:border-primary resize-none"
             />
           </div>
+
+          {renderPriceSummary()}
 
           <input type="hidden" name="productId" value={productId} />
 

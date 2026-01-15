@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS public.referrals (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  owner_first_name TEXT NOT NULL,
+  owner_last_name TEXT NOT NULL,
+  discount_percent INTEGER NOT NULL DEFAULT 0,
+  commission_percent INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS referral_id UUID NULL REFERENCES public.referrals(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS referral_code TEXT NULL,
+  ADD COLUMN IF NOT EXISTS base_price_cents INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS discount_amount_cents INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS final_price_cents INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_commission_percent INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_commission_cents INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_paid BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS referral_paid_at TIMESTAMP WITH TIME ZONE NULL;
+
+CREATE INDEX IF NOT EXISTS orders_referral_idx
+  ON public.orders (referral_id);

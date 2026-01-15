@@ -7,10 +7,11 @@ interface OrderDialogProps {
   onOpenChange: (open: boolean) => void;
   productId: string;
   productName: string;
+  priceCents: number;
   isConsultation?: boolean;
 }
 
-const OrderDialog = ({ open, onOpenChange, productId, productName, isConsultation = false }: OrderDialogProps) => {
+const OrderDialog = ({ open, onOpenChange, productId, productName, priceCents, isConsultation = false }: OrderDialogProps) => {
   const { t } = useLanguage();
 
   return (
@@ -23,6 +24,7 @@ const OrderDialog = ({ open, onOpenChange, productId, productName, isConsultatio
         <OrderForm 
           productId={productId} 
           productName={productName} 
+          basePriceCents={priceCents}
           isConsultation={isConsultation}
           onSuccess={() => onOpenChange(false)} 
         />

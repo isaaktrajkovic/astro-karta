@@ -604,6 +604,36 @@ const horoscopeSubscriptionPlans = new Map([
   ['monthly-premium', 'premium'],
 ]);
 
+const productPriceCentsById = new Map([
+  ['monthly-basic', 500],
+  ['monthly-premium', 1000],
+  ['report-natal', 11000],
+  ['report-yearly', 7000],
+  ['report-solar', 9000],
+  ['report-synastry', 15000],
+  ['report-questions', 3500],
+  ['report-love', 1000],
+  ['report-career', 1200],
+  ['consult-email', 600],
+  ['consult-vip', 1200],
+  ['consult-live', 1500],
+  ['physical-talisman', 3000],
+  ['physical-crystal', 4000],
+]);
+
+const getProductPriceCents = (productId) => {
+  const price = productPriceCentsById.get(productId);
+  return Number.isFinite(price) ? price : 0;
+};
+
+const clampPercent = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(Math.max(Math.round(numeric), 0), 100);
+};
+
+const normalizeReferralCode = (value) => String(value || '').trim().toUpperCase();
+
 const getSupportedLanguage = (language) =>
   Object.prototype.hasOwnProperty.call(languageLabelByCode, language) ? language : 'sr';
 
@@ -1801,6 +1831,7 @@ app.post('/api/orders', async (req, res) => {
     language,
     timezone,
     gender,
+    referral_code,
   } = req.body || {};
 
   const normalizedBirthTime = String(birth_time || '').trim();
@@ -1823,6 +1854,42 @@ app.post('/api/orders', async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const basePriceCents = getProductPriceCents(product_id);
+  let referralId = null;
+  let referralCode = null;
+  let discountPercent = 0;
+  let discountAmountCents = 0;
+  let finalPriceCents = basePriceCents;
+  let commissionPercent = 0;
+  let commissionAmountCents = 0;
+
+  const normalizedReferralCode = normalizeReferralCode(referral_code);
+  if (normalizedReferralCode) {
+    try {
+      const { rows: referralRows } = await pool.query(
+        `SELECT id, code, discount_percent, commission_percent, is_active
+         FROM referrals
+         WHERE code = $1
+         LIMIT 1`,
+        [normalizedReferralCode]
+      );
+      const referral = referralRows[0];
+      if (!referral || !referral.is_active) {
+        return res.status(400).json({ error: 'Invalid referral code' });
+      }
+      referralId = referral.id;
+      referralCode = referral.code;
+      discountPercent = clampPercent(referral.discount_percent);
+      commissionPercent = clampPercent(referral.commission_percent);
+      discountAmountCents = Math.round((basePriceCents * discountPercent) / 100);
+      finalPriceCents = Math.max(basePriceCents - discountAmountCents, 0);
+      commissionAmountCents = Math.round((finalPriceCents * commissionPercent) / 100);
+    } catch (error) {
+      console.error('Failed to validate referral code:', error);
+      return res.status(500).json({ error: 'Failed to validate referral code' });
+    }
+  }
+
   try {
     const { rows } = await pool.query(
       `INSERT INTO orders (
@@ -1833,15 +1900,25 @@ app.post('/api/orders', async (req, res) => {
         last_name,
         birth_date,
         birth_time,
-      birth_place,
-      city,
-      country,
-      email,
-      gender,
-      note,
-      consultation_description,
-      language
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        birth_place,
+        city,
+        country,
+        email,
+        gender,
+        note,
+        consultation_description,
+        language,
+        referral_id,
+        referral_code,
+        base_price_cents,
+        discount_percent,
+        discount_amount_cents,
+        final_price_cents,
+        referral_commission_percent,
+        referral_commission_cents,
+        referral_paid,
+        referral_paid_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING id`,
       [
         product_id,
@@ -1859,6 +1936,16 @@ app.post('/api/orders', async (req, res) => {
         note || null,
         consultation_description || null,
         normalizedLanguage,
+        referralId,
+        referralCode,
+        basePriceCents,
+        discountPercent,
+        discountAmountCents,
+        finalPriceCents,
+        commissionPercent,
+        commissionAmountCents,
+        false,
+        null,
       ]
     );
 
@@ -1942,6 +2029,16 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
         note,
         consultation_description,
         language,
+        referral_id,
+        referral_code,
+        base_price_cents,
+        discount_percent,
+        discount_amount_cents,
+        final_price_cents,
+        referral_commission_percent,
+        referral_commission_cents,
+        referral_paid,
+        referral_paid_at,
         status,
         created_at
       FROM orders
@@ -2064,6 +2161,243 @@ app.post('/api/orders/:id/send-report', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Failed to send report:', error);
     return res.status(500).json({ error: 'Failed to send report' });
+  }
+});
+
+app.get('/api/referrals/validate', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const code = normalizeReferralCode(req.query?.code);
+  if (!code) {
+    return res.json({ valid: false });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT code, discount_percent
+       FROM referrals
+       WHERE code = $1 AND is_active = true
+       LIMIT 1`,
+      [code]
+    );
+    if (!rows.length) {
+      return res.json({ valid: false });
+    }
+    return res.json({ valid: true, code: rows[0].code, discountPercent: clampPercent(rows[0].discount_percent) });
+  } catch (error) {
+    console.error('Failed to validate referral:', error);
+    return res.status(500).json({ error: 'Failed to validate referral' });
+  }
+});
+
+app.get('/api/referrals', requireAuth, async (_req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        r.id,
+        r.code,
+        r.owner_first_name,
+        r.owner_last_name,
+        r.discount_percent,
+        r.commission_percent,
+        r.is_active,
+        r.created_at,
+        COUNT(o.id)::int AS order_count,
+        COALESCE(SUM(o.final_price_cents), 0)::int AS total_revenue_cents,
+        COALESCE(SUM(o.referral_commission_cents), 0)::int AS total_commission_cents,
+        COALESCE(SUM(CASE WHEN o.referral_paid THEN o.referral_commission_cents ELSE 0 END), 0)::int AS paid_commission_cents,
+        COALESCE(SUM(CASE WHEN o.referral_paid THEN 0 ELSE o.referral_commission_cents END), 0)::int AS unpaid_commission_cents
+      FROM referrals r
+      LEFT JOIN orders o ON o.referral_id = r.id
+      GROUP BY r.id
+      ORDER BY r.created_at DESC`
+    );
+    return res.json({ referrals: rows });
+  } catch (error) {
+    console.error('Failed to fetch referrals:', error);
+    return res.status(500).json({ error: 'Failed to fetch referrals' });
+  }
+});
+
+app.post('/api/referrals', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const {
+    code,
+    owner_first_name,
+    owner_last_name,
+    discount_percent,
+    commission_percent,
+    is_active,
+  } = req.body || {};
+
+  const normalizedCode = normalizeReferralCode(code);
+  const ownerFirstName = String(owner_first_name || '').trim();
+  const ownerLastName = String(owner_last_name || '').trim();
+  if (!normalizedCode || !ownerFirstName || !ownerLastName) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO referrals (
+        code,
+        owner_first_name,
+        owner_last_name,
+        discount_percent,
+        commission_percent,
+        is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id`,
+      [
+        normalizedCode,
+        ownerFirstName,
+        ownerLastName,
+        clampPercent(discount_percent),
+        clampPercent(commission_percent),
+        is_active !== false,
+      ]
+    );
+    return res.status(201).json({ success: true, referralId: rows[0]?.id });
+  } catch (error) {
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'Referral code already exists' });
+    }
+    console.error('Failed to create referral:', error);
+    return res.status(500).json({ error: 'Failed to create referral' });
+  }
+});
+
+app.patch('/api/referrals/:id', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const referralId = Number(req.params.id);
+  if (!Number.isInteger(referralId) || referralId <= 0) {
+    return res.status(400).json({ error: 'Invalid referral id' });
+  }
+
+  const {
+    code,
+    owner_first_name,
+    owner_last_name,
+    discount_percent,
+    commission_percent,
+    is_active,
+  } = req.body || {};
+
+  const normalizedCode = normalizeReferralCode(code);
+  const ownerFirstName = String(owner_first_name || '').trim();
+  const ownerLastName = String(owner_last_name || '').trim();
+  if (!normalizedCode || !ownerFirstName || !ownerLastName) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE referrals
+       SET code = $1,
+           owner_first_name = $2,
+           owner_last_name = $3,
+           discount_percent = $4,
+           commission_percent = $5,
+           is_active = $6
+       WHERE id = $7`,
+      [
+        normalizedCode,
+        ownerFirstName,
+        ownerLastName,
+        clampPercent(discount_percent),
+        clampPercent(commission_percent),
+        is_active !== false,
+        referralId,
+      ]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: 'Referral not found' });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'Referral code already exists' });
+    }
+    console.error('Failed to update referral:', error);
+    return res.status(500).json({ error: 'Failed to update referral' });
+  }
+});
+
+app.get('/api/referrals/:id/orders', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const referralId = Number(req.params.id);
+  if (!Number.isInteger(referralId) || referralId <= 0) {
+    return res.status(400).json({ error: 'Invalid referral id' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        id,
+        customer_name,
+        product_name,
+        final_price_cents,
+        referral_commission_cents,
+        referral_paid,
+        referral_paid_at,
+        status,
+        created_at
+      FROM orders
+      WHERE referral_id = $1
+      ORDER BY created_at DESC`,
+      [referralId]
+    );
+    return res.json({ orders: rows });
+  } catch (error) {
+    console.error('Failed to fetch referral orders:', error);
+    return res.status(500).json({ error: 'Failed to fetch referral orders' });
+  }
+});
+
+app.patch('/api/orders/:id/referral-paid', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+
+  const { paid } = req.body || {};
+  const isPaid = Boolean(paid);
+  const paidAt = isPaid ? new Date() : null;
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE orders
+       SET referral_paid = $1,
+           referral_paid_at = $2
+       WHERE id = $3`,
+      [isPaid, paidAt, orderId]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to update referral payment status:', error);
+    return res.status(500).json({ error: 'Failed to update referral payment status' });
   }
 });
 

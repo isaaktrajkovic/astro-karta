@@ -2,18 +2,19 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderDialog from '@/components/OrderDialog';
+import { formatPrice } from '@/lib/utils';
 
 interface ProductCardProps {
   id: string;
   title: string;
   description: string;
-  price: string;
+  priceCents: number;
   image: string;
   badge?: string;
   isConsultation?: boolean;
 }
 
-const ProductCard = ({ id, title, description, price, image, badge, isConsultation = false }: ProductCardProps) => {
+const ProductCard = ({ id, title, description, priceCents, image, badge, isConsultation = false }: ProductCardProps) => {
   const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -50,7 +51,7 @@ const ProductCard = ({ id, title, description, price, image, badge, isConsultati
           </div>
           
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-bold text-primary">{price}</span>
+            <span className="text-2xl font-bold text-primary">{formatPrice(priceCents)}</span>
             <Button 
               type="button"
               variant="cosmic" 
@@ -68,6 +69,7 @@ const ProductCard = ({ id, title, description, price, image, badge, isConsultati
         onOpenChange={setIsDialogOpen}
         productId={id}
         productName={title}
+        priceCents={priceCents}
         isConsultation={isConsultation}
       />
     </>

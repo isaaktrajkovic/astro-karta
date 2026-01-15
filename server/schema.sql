@@ -1,3 +1,14 @@
+CREATE TABLE IF NOT EXISTS referrals (
+  id SERIAL PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  owner_first_name TEXT NOT NULL,
+  owner_last_name TEXT NOT NULL,
+  discount_percent INT NOT NULL DEFAULT 0,
+  commission_percent INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,
   product_id TEXT NOT NULL,
@@ -15,6 +26,16 @@ CREATE TABLE IF NOT EXISTS orders (
   note TEXT NULL,
   consultation_description TEXT NULL,
   language TEXT NOT NULL DEFAULT 'sr',
+  referral_id INT NULL REFERENCES referrals(id),
+  referral_code TEXT NULL,
+  base_price_cents INT NOT NULL DEFAULT 0,
+  discount_percent INT NOT NULL DEFAULT 0,
+  discount_amount_cents INT NOT NULL DEFAULT 0,
+  final_price_cents INT NOT NULL DEFAULT 0,
+  referral_commission_percent INT NOT NULL DEFAULT 0,
+  referral_commission_cents INT NOT NULL DEFAULT 0,
+  referral_paid BOOLEAN NOT NULL DEFAULT FALSE,
+  referral_paid_at TIMESTAMPTZ NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT orders_status_check CHECK (status IN ('pending', 'processing', 'completed', 'cancelled')),
@@ -102,3 +123,6 @@ CREATE INDEX IF NOT EXISTS horoscope_delivery_log_date_idx
 
 CREATE INDEX IF NOT EXISTS horoscope_delivery_log_subscription_idx
   ON horoscope_delivery_log (subscription_id);
+
+CREATE INDEX IF NOT EXISTS orders_referral_idx
+  ON orders (referral_id);

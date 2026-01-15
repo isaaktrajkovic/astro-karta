@@ -1,3 +1,14 @@
+CREATE TABLE IF NOT EXISTS referrals (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(64) NOT NULL UNIQUE,
+  owner_first_name VARCHAR(255) NOT NULL,
+  owner_last_name VARCHAR(255) NOT NULL,
+  discount_percent INT NOT NULL DEFAULT 0,
+  commission_percent INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   product_id VARCHAR(255) NOT NULL,
@@ -15,8 +26,19 @@ CREATE TABLE IF NOT EXISTS orders (
   note TEXT NULL,
   consultation_description TEXT NULL,
   language VARCHAR(8) NOT NULL DEFAULT 'sr',
+  referral_id INT NULL,
+  referral_code VARCHAR(64) NULL,
+  base_price_cents INT NOT NULL DEFAULT 0,
+  discount_percent INT NOT NULL DEFAULT 0,
+  discount_amount_cents INT NOT NULL DEFAULT 0,
+  final_price_cents INT NOT NULL DEFAULT 0,
+  referral_commission_percent INT NOT NULL DEFAULT 0,
+  referral_commission_cents INT NOT NULL DEFAULT 0,
+  referral_paid TINYINT(1) NOT NULL DEFAULT 0,
+  referral_paid_at TIMESTAMP NULL DEFAULT NULL,
   status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT orders_referral_fk FOREIGN KEY (referral_id) REFERENCES referrals(id)
 );
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -89,3 +111,5 @@ CREATE TABLE IF NOT EXISTS horoscope_delivery_log (
 CREATE INDEX horoscope_subscriptions_due_idx ON horoscope_subscriptions (status, next_send_at);
 CREATE INDEX horoscope_delivery_log_date_idx ON horoscope_delivery_log (horoscope_date);
 CREATE INDEX horoscope_delivery_log_subscription_idx ON horoscope_delivery_log (subscription_id);
+
+CREATE INDEX orders_referral_idx ON orders (referral_id);

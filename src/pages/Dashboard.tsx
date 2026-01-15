@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
@@ -8,7 +8,22 @@ import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
-import { getOrders, getUsage, Order as ApiOrder, updateOrderStatus as apiUpdateOrderStatus, deleteOrders, sendOrderReport } from '@/lib/api';
+import {
+  getOrders,
+  getUsage,
+  Order as ApiOrder,
+  updateOrderStatus as apiUpdateOrderStatus,
+  deleteOrders,
+  sendOrderReport,
+  getReferrals,
+  createReferral,
+  updateReferral,
+  getReferralOrders,
+  updateOrderReferralPaid,
+  Referral as ApiReferral,
+  ReferralOrder as ApiReferralOrder,
+} from '@/lib/api';
+import { formatPrice } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -27,8 +42,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 type Order = ApiOrder;
+type Referral = ApiReferral;
+type ReferralOrder = ApiReferralOrder;
 
 type StatusFilter = 'all' | 'pending' | 'processing' | 'completed' | 'cancelled';
 type TimeFilter = 'all' | 'today' | 'week' | 'month' | 'year';
@@ -90,6 +108,22 @@ const Dashboard = () => {
   const [reportSubject, setReportSubject] = useState('');
   const [reportMessage, setReportMessage] = useState('');
   const [reportIsSending, setReportIsSending] = useState(false);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [referralsLoading, setReferralsLoading] = useState(false);
+  const [referralOrders, setReferralOrders] = useState<ReferralOrder[]>([]);
+  const [referralOrdersLoading, setReferralOrdersLoading] = useState(false);
+  const [referralOrdersDialogOpen, setReferralOrdersDialogOpen] = useState(false);
+  const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
+  const [referralForm, setReferralForm] = useState({
+    code: '',
+    ownerFirstName: '',
+    ownerLastName: '',
+    discountPercent: '',
+    commissionPercent: '',
+    isActive: true,
+  });
+  const [referralEditingId, setReferralEditingId] = useState<number | null>(null);
+  const [referralSaving, setReferralSaving] = useState(false);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -115,6 +149,188 @@ const Dashboard = () => {
       setCalculatorUsageCount(usage?.length || 0);
     } catch (error) {
       console.error('Error fetching calculator usage:', error);
+    }
+  };
+
+  const fetchReferrals = async () => {
+    setReferralsLoading(true);
+    try {
+      const { referrals } = await getReferrals();
+      setReferrals(referrals || []);
+    } catch (error) {
+      console.error('Error fetching referrals:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće učitati referale'
+          : 'Could not load referrals',
+        variant: 'destructive',
+      });
+    } finally {
+      setReferralsLoading(false);
+    }
+  };
+
+  const resetReferralForm = () => {
+    setReferralForm({
+      code: '',
+      ownerFirstName: '',
+      ownerLastName: '',
+      discountPercent: '',
+      commissionPercent: '',
+      isActive: true,
+    });
+    setReferralEditingId(null);
+  };
+
+  const handleEditReferral = (referral: Referral) => {
+    setReferralForm({
+      code: referral.code,
+      ownerFirstName: referral.owner_first_name,
+      ownerLastName: referral.owner_last_name,
+      discountPercent: String(referral.discount_percent),
+      commissionPercent: String(referral.commission_percent),
+      isActive: referral.is_active,
+    });
+    setReferralEditingId(referral.id);
+  };
+
+  const handleSaveReferral = async () => {
+    const code = referralForm.code.trim().toUpperCase();
+    const ownerFirstName = referralForm.ownerFirstName.trim();
+    const ownerLastName = referralForm.ownerLastName.trim();
+    const discountPercent = Number(referralForm.discountPercent);
+    const commissionPercent = Number(referralForm.commissionPercent);
+
+    if (!code || !ownerFirstName || !ownerLastName) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Popunite sva obavezna polja.'
+          : 'Please fill out all required fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100 ||
+      !Number.isFinite(commissionPercent) ||
+      commissionPercent < 0 ||
+      commissionPercent > 100
+    ) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Procenat popusta i provizije mora biti između 0 i 100.'
+          : 'Discount and commission must be between 0 and 100.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setReferralSaving(true);
+    try {
+      const payload = {
+        code,
+        owner_first_name: ownerFirstName,
+        owner_last_name: ownerLastName,
+        discount_percent: discountPercent,
+        commission_percent: commissionPercent,
+        is_active: referralForm.isActive,
+      };
+      if (referralEditingId) {
+        await updateReferral(referralEditingId, payload);
+        toast({
+          title: language === 'sr' ? 'Ažurirano' : 'Updated',
+          description: language === 'sr'
+            ? 'Referal je ažuriran.'
+            : 'Referral updated.',
+        });
+      } else {
+        await createReferral(payload);
+        toast({
+          title: language === 'sr' ? 'Kreirano' : 'Created',
+          description: language === 'sr'
+            ? 'Referal je dodat.'
+            : 'Referral added.',
+        });
+      }
+      resetReferralForm();
+      fetchReferrals();
+    } catch (error) {
+      console.error('Error saving referral:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr' ? 'Čuvanje nije uspelo.' : 'Failed to save referral.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setReferralSaving(false);
+    }
+  };
+
+  const handleOpenReferralOrders = async (referral: Referral) => {
+    setSelectedReferral(referral);
+    setReferralOrders([]);
+    setReferralOrdersDialogOpen(true);
+    setReferralOrdersLoading(true);
+    try {
+      const { orders } = await getReferralOrders(referral.id);
+      setReferralOrders(orders || []);
+    } catch (error) {
+      console.error('Error fetching referral orders:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće učitati porudžbine.'
+          : 'Could not load orders.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReferralOrdersLoading(false);
+    }
+  };
+
+  const handleReferralOrdersDialogChange = (open: boolean) => {
+    setReferralOrdersDialogOpen(open);
+    if (!open) {
+      setSelectedReferral(null);
+      setReferralOrders([]);
+      setReferralOrdersLoading(false);
+    }
+  };
+
+  const handleMarkReferralPaid = async (orderId: number) => {
+    try {
+      await updateOrderReferralPaid(orderId, true);
+      setReferralOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId
+            ? { ...order, referral_paid: true, referral_paid_at: new Date().toISOString() }
+            : order
+        )
+      );
+      fetchReferrals();
+      toast({
+        title: language === 'sr' ? 'Isplaćeno' : 'Paid',
+        description: language === 'sr'
+          ? 'Porudžbina je označena kao isplaćena.'
+          : 'Order marked as paid.',
+      });
+    } catch (error) {
+      console.error('Error updating referral payment:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće ažurirati isplatu.'
+          : 'Could not update payout.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -236,6 +452,7 @@ const Dashboard = () => {
   useEffect(() => {
     fetchOrders();
     fetchCalculatorUsage();
+    fetchReferrals();
   }, []);
 
   // Get unique products for filter
@@ -278,18 +495,21 @@ const Dashboard = () => {
         switch (timeFilter) {
           case 'today':
             return orderDate >= startOfToday;
-          case 'week':
+          case 'week': {
             const weekAgo = new Date(startOfToday);
             weekAgo.setDate(weekAgo.getDate() - 7);
             return orderDate >= weekAgo;
-          case 'month':
+          }
+          case 'month': {
             const monthAgo = new Date(startOfToday);
             monthAgo.setMonth(monthAgo.getMonth() - 1);
             return orderDate >= monthAgo;
-          case 'year':
+          }
+          case 'year': {
             const yearAgo = new Date(startOfToday);
             yearAgo.setFullYear(yearAgo.getFullYear() - 1);
             return orderDate >= yearAgo;
+          }
           default:
             return true;
         }
@@ -843,6 +1063,284 @@ const Dashboard = () => {
           )}
         </div>
 
+        {/* Referrals Section */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Tag className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              {language === 'sr' ? 'Referal kodovi' : 'Referral codes'}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
+                {referralEditingId
+                  ? (language === 'sr' ? 'Izmena referala' : 'Edit referral')
+                  : (language === 'sr' ? 'Dodaj referal' : 'Add referral')}
+              </h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="referral-code">
+                    {language === 'sr' ? 'Kod' : 'Code'}
+                  </Label>
+                  <Input
+                    id="referral-code"
+                    value={referralForm.code}
+                    onChange={(event) =>
+                      setReferralForm((prev) => ({
+                        ...prev,
+                        code: event.target.value.toUpperCase(),
+                      }))
+                    }
+                    placeholder={language === 'sr' ? 'Npr. ASTRO10' : 'e.g. ASTRO10'}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="referral-owner-first">
+                      {language === 'sr' ? 'Ime' : 'First name'}
+                    </Label>
+                    <Input
+                      id="referral-owner-first"
+                      value={referralForm.ownerFirstName}
+                      onChange={(event) =>
+                        setReferralForm((prev) => ({
+                          ...prev,
+                          ownerFirstName: event.target.value,
+                        }))
+                      }
+                      className="bg-secondary/50 border-border focus:border-primary"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="referral-owner-last">
+                      {language === 'sr' ? 'Prezime' : 'Last name'}
+                    </Label>
+                    <Input
+                      id="referral-owner-last"
+                      value={referralForm.ownerLastName}
+                      onChange={(event) =>
+                        setReferralForm((prev) => ({
+                          ...prev,
+                          ownerLastName: event.target.value,
+                        }))
+                      }
+                      className="bg-secondary/50 border-border focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="referral-discount">
+                      {language === 'sr' ? 'Popust (%)' : 'Discount (%)'}
+                    </Label>
+                    <Input
+                      id="referral-discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={referralForm.discountPercent}
+                      onChange={(event) =>
+                        setReferralForm((prev) => ({
+                          ...prev,
+                          discountPercent: event.target.value,
+                        }))
+                      }
+                      className="bg-secondary/50 border-border focus:border-primary"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="referral-commission">
+                      {language === 'sr' ? 'Provizija (%)' : 'Commission (%)'}
+                    </Label>
+                    <Input
+                      id="referral-commission"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={referralForm.commissionPercent}
+                      onChange={(event) =>
+                        setReferralForm((prev) => ({
+                          ...prev,
+                          commissionPercent: event.target.value,
+                        }))
+                      }
+                      className="bg-secondary/50 border-border focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">
+                      {language === 'sr' ? 'Aktivan' : 'Active'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {language === 'sr'
+                        ? 'Kod može da se koristi pri narudžbini'
+                        : 'Code can be used during checkout'}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={referralForm.isActive}
+                    onCheckedChange={(checked) =>
+                      setReferralForm((prev) => ({ ...prev, isActive: checked }))
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="cosmic"
+                    onClick={handleSaveReferral}
+                    disabled={referralSaving}
+                  >
+                    {referralSaving
+                      ? (language === 'sr' ? 'Čuvanje...' : 'Saving...')
+                      : (referralEditingId
+                        ? (language === 'sr' ? 'Sačuvaj izmene' : 'Save changes')
+                        : (language === 'sr' ? 'Dodaj referal' : 'Add referral'))}
+                  </Button>
+                  {referralEditingId && (
+                    <Button type="button" variant="outline" onClick={resetReferralForm}>
+                      {language === 'sr' ? 'Otkaži' : 'Cancel'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 bg-card rounded-xl border border-border overflow-hidden">
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">
+                  {language === 'sr' ? 'Pregled referala' : 'Referral overview'}
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchReferrals}
+                  disabled={referralsLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${referralsLoading ? 'animate-spin' : ''}`} />
+                  {language === 'sr' ? 'Osveži' : 'Refresh'}
+                </Button>
+              </div>
+
+              {referralsLoading ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                  {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
+                </div>
+              ) : referrals.length === 0 ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  {language === 'sr' ? 'Nema referal kodova.' : 'No referral codes yet.'}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-secondary/30">
+                      <tr>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Kod' : 'Code'}
+                        </th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Nosilac' : 'Owner'}
+                        </th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Porudžbine' : 'Orders'}
+                        </th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Provizija' : 'Commission'}
+                        </th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Status' : 'Status'}
+                        </th>
+                        <th className="text-right p-4 text-sm font-medium text-muted-foreground">
+                          {language === 'sr' ? 'Akcije' : 'Actions'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {referrals.map((referral) => (
+                        <tr
+                          key={referral.id}
+                          className="border-t border-border hover:bg-secondary/10 transition-colors"
+                        >
+                          <td className="p-4">
+                            <div className="font-medium text-foreground">{referral.code}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {language === 'sr' ? 'Popust' : 'Discount'}: {referral.discount_percent}%
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-foreground">
+                              {referral.owner_first_name} {referral.owner_last_name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {language === 'sr' ? 'Provizija' : 'Commission'}: {referral.commission_percent}%
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-foreground">{referral.order_count}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatPrice(referral.total_revenue_cents)}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-foreground">
+                              {formatPrice(referral.total_commission_cents)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {language === 'sr' ? 'Neisplaćeno' : 'Unpaid'}:{' '}
+                              {formatPrice(referral.unpaid_commission_cents)}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
+                                referral.is_active
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {referral.is_active
+                                ? (language === 'sr' ? 'Aktivan' : 'Active')
+                                : (language === 'sr' ? 'Neaktivan' : 'Inactive')}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenReferralOrders(referral)}
+                              >
+                                {language === 'sr' ? 'Porudžbine' : 'Orders'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditReferral(referral)}
+                              >
+                                {language === 'sr' ? 'Izmeni' : 'Edit'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <CalculatorUsageDialog 
           open={usageDialogOpen} 
           onOpenChange={setUsageDialogOpen} 
@@ -929,6 +1427,120 @@ const Dashboard = () => {
                 {reportIsSending ? (language === 'sr' ? 'Slanje...' : 'Sending...') : (language === 'sr' ? 'Pošalji' : 'Send')}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={referralOrdersDialogOpen} onOpenChange={handleReferralOrdersDialogChange}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Tag className="w-5 h-5 text-primary" />
+                {language === 'sr' ? 'Porudžbine referala' : 'Referral orders'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedReferral
+                  ? `${selectedReferral.code} • ${selectedReferral.owner_first_name} ${selectedReferral.owner_last_name}`
+                  : (language === 'sr' ? 'Nema izabranog referala.' : 'No referral selected.')}
+              </DialogDescription>
+            </DialogHeader>
+
+            {referralOrdersLoading ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
+              </div>
+            ) : referralOrders.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                {language === 'sr' ? 'Nema porudžbina za ovaj kod.' : 'No orders for this code.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-secondary/30">
+                    <tr>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Kupac' : 'Customer'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Proizvod' : 'Product'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Ukupno' : 'Total'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Provizija' : 'Commission'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Status' : 'Status'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Isplata' : 'Payout'}
+                      </th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Akcije' : 'Actions'}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {referralOrders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="border-t border-border hover:bg-secondary/10 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div className="text-foreground">{order.customer_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(order.created_at).toLocaleDateString(language === 'sr' ? 'sr-RS' : 'en-US')}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-foreground">{order.product_name}</div>
+                        </td>
+                        <td className="p-4 text-foreground">
+                          {formatPrice(order.final_price_cents)}
+                        </td>
+                        <td className="p-4 text-foreground">
+                          {formatPrice(order.referral_commission_cents)}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {getStatusLabel(order.status)}
+                        </td>
+                        <td className="p-4 text-sm">
+                          {order.referral_paid ? (
+                            <div className="text-emerald-400">
+                              {language === 'sr' ? 'Isplaćeno' : 'Paid'}
+                              {order.referral_paid_at && (
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(order.referral_paid_at).toLocaleDateString(
+                                    language === 'sr' ? 'sr-RS' : 'en-US'
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {language === 'sr' ? 'Nije isplaćeno' : 'Unpaid'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={order.referral_paid}
+                            onClick={() => handleMarkReferralPaid(order.id)}
+                          >
+                            {order.referral_paid
+                              ? (language === 'sr' ? 'Isplaćeno' : 'Paid')
+                              : (language === 'sr' ? 'Označi' : 'Mark paid')}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

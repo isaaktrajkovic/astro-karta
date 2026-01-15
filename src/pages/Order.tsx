@@ -3,18 +3,19 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderForm from '@/components/OrderForm';
+import { formatPrice } from '@/lib/utils';
 
-const productData: Record<string, { titleSr: string; titleEn: string; price: string }> = {
-  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', price: '5€' },
-  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package', price: '10€' },
-  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', price: '15€' },
-  'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', price: '10€' },
-  'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', price: '12€' },
-  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', price: '6€' },
-  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', price: '12€' },
-  'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation', price: '15€' },
-  'physical-talisman': { titleSr: 'Talisman set', titleEn: 'Talisman Set', price: '30€' },
-  'physical-crystal': { titleSr: 'Premium kristal set', titleEn: 'Premium Crystal Set', price: '40€' },
+const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
+  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 500 },
+  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package', priceCents: 1000 },
+  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
+  'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
+  'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },
+  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 600 },
+  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', priceCents: 1200 },
+  'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation', priceCents: 1500 },
+  'physical-talisman': { titleSr: 'Talisman set', titleEn: 'Talisman Set', priceCents: 3000 },
+  'physical-crystal': { titleSr: 'Premium kristal set', titleEn: 'Premium Crystal Set', priceCents: 4000 },
 };
 
 const Order = () => {
@@ -58,11 +59,15 @@ const Order = () => {
               </h1>
               <div className="flex items-center justify-center gap-4">
                 <span className="text-lg text-foreground">{productName}</span>
-                <span className="text-2xl font-bold text-primary">{product.price}</span>
+                <span className="text-2xl font-bold text-primary">{formatPrice(product.priceCents)}</span>
               </div>
             </div>
 
-            <OrderForm productId={productId || ''} productName={productName} />
+            <OrderForm
+              productId={productId || ''}
+              productName={productName}
+              basePriceCents={product.priceCents}
+            />
           </div>
         </div>
       </div>

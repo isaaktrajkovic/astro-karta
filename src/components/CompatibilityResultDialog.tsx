@@ -11,6 +11,7 @@ import { Heart, Sparkles, Star, ExternalLink, Share2, Copy } from 'lucide-react'
 import OrderDialog from './OrderDialog';
 import { getCompatibilityDescription } from '@/lib/compatibilityDescriptions';
 import { toast } from 'sonner';
+import { formatPrice } from '@/lib/utils';
 
 // Social media icons as simple SVG components
 const WhatsAppIcon = () => (
@@ -64,6 +65,7 @@ const CompatibilityResultDialog = ({
   const [showProgress, setShowProgress] = useState(0);
   const [showUpsell, setShowUpsell] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const priceCents = 15000;
   const [loadingDots, setLoadingDots] = useState(0);
 
   useEffect(() => {
@@ -315,7 +317,7 @@ const CompatibilityResultDialog = ({
                       }}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      {t('compatibility.upsell.cta')} - 150€
+                      {t('compatibility.upsell.cta')} - {formatPrice(priceCents)}
                     </Button>
                   </div>
                 </div>
@@ -331,6 +333,7 @@ const CompatibilityResultDialog = ({
         onOpenChange={setShowOrderDialog}
         productId="report-synastry"
         productName={t('reports.synastry.title')}
+        priceCents={priceCents}
       />
     </>
   );

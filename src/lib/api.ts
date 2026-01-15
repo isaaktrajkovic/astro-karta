@@ -23,13 +23,39 @@ export interface Order {
   note: string | null;
   consultation_description: string | null;
   language: string | null;
+  referral_id: number | null;
+  referral_code: string | null;
+  base_price_cents: number;
+  discount_percent: number;
+  discount_amount_cents: number;
+  final_price_cents: number;
+  referral_commission_percent: number;
+  referral_commission_cents: number;
+  referral_paid: boolean;
+  referral_paid_at: string | null;
   status: string;
   created_at: string;
 }
 
-export type CreateOrderPayload = Omit<Order, 'id' | 'status' | 'created_at'> & {
+export type CreateOrderPayload = Omit<
+  Order,
+  | 'id'
+  | 'status'
+  | 'created_at'
+  | 'referral_id'
+  | 'referral_code'
+  | 'base_price_cents'
+  | 'discount_percent'
+  | 'discount_amount_cents'
+  | 'final_price_cents'
+  | 'referral_commission_percent'
+  | 'referral_commission_cents'
+  | 'referral_paid'
+  | 'referral_paid_at'
+> & {
   language?: string;
   timezone?: string;
+  referral_code?: string | null;
 };
 
 export interface CalculatorUsage {
@@ -73,6 +99,43 @@ export interface HoroscopeDeliveryLog {
   provider_id: string | null;
   error_message: string | null;
   created_at: string;
+}
+
+export interface Referral {
+  id: number;
+  code: string;
+  owner_first_name: string;
+  owner_last_name: string;
+  discount_percent: number;
+  commission_percent: number;
+  is_active: boolean;
+  created_at: string;
+  order_count: number;
+  total_revenue_cents: number;
+  total_commission_cents: number;
+  paid_commission_cents: number;
+  unpaid_commission_cents: number;
+}
+
+export interface ReferralOrder {
+  id: number;
+  customer_name: string;
+  product_name: string;
+  final_price_cents: number;
+  referral_commission_cents: number;
+  referral_paid: boolean;
+  referral_paid_at: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface ReferralUpsertPayload {
+  code: string;
+  owner_first_name: string;
+  owner_last_name: string;
+  discount_percent: number;
+  commission_percent: number;
+  is_active: boolean;
 }
 
 export interface CreateTestHoroscopeSubscriptionPayload {
@@ -214,6 +277,47 @@ export const getUsage = () =>
   request<{ usage: CalculatorUsage[] }>('/api/usage', {
     method: 'GET',
     auth: true,
+  });
+
+export const validateReferralCode = (code: string) =>
+  request<{ valid: boolean; code?: string; discountPercent?: number }>(
+    `/api/referrals/validate?code=${encodeURIComponent(code)}`,
+    {
+      method: 'GET',
+    }
+  );
+
+export const getReferrals = () =>
+  request<{ referrals: Referral[] }>('/api/referrals', {
+    method: 'GET',
+    auth: true,
+  });
+
+export const createReferral = (payload: ReferralUpsertPayload) =>
+  request<{ success: true; referralId: number }>('/api/referrals', {
+    method: 'POST',
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+
+export const updateReferral = (referralId: number, payload: ReferralUpsertPayload) =>
+  request<{ success: true }>(`/api/referrals/${referralId}`, {
+    method: 'PATCH',
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+
+export const getReferralOrders = (referralId: number) =>
+  request<{ orders: ReferralOrder[] }>(`/api/referrals/${referralId}/orders`, {
+    method: 'GET',
+    auth: true,
+  });
+
+export const updateOrderReferralPaid = (orderId: number, paid: boolean) =>
+  request<{ success: true }>(`/api/orders/${orderId}/referral-paid`, {
+    method: 'PATCH',
+    auth: true,
+    body: JSON.stringify({ paid }),
   });
 
 export const trackUsage = (payload: Pick<CalculatorUsage, 'sign1' | 'sign2' | 'compatibility'>) =>

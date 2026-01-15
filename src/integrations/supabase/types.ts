@@ -40,6 +40,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          base_price_cents: number
           birth_date: string
           birth_place: string
           birth_time: string | null
@@ -48,17 +49,27 @@ export type Database = {
           country: string | null
           created_at: string
           customer_name: string
+          discount_amount_cents: number
+          discount_percent: number
           email: string
+          final_price_cents: number
           first_name: string | null
           id: string
           last_name: string | null
           note: string | null
           product_id: string
           product_name: string
+          referral_code: string | null
+          referral_commission_cents: number
+          referral_commission_percent: number
+          referral_id: string | null
+          referral_paid: boolean
+          referral_paid_at: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          base_price_cents?: number
           birth_date: string
           birth_place: string
           birth_time?: string | null
@@ -67,17 +78,27 @@ export type Database = {
           country?: string | null
           created_at?: string
           customer_name: string
+          discount_amount_cents?: number
+          discount_percent?: number
           email: string
+          final_price_cents?: number
           first_name?: string | null
           id?: string
           last_name?: string | null
           note?: string | null
           product_id: string
           product_name: string
+          referral_code?: string | null
+          referral_commission_cents?: number
+          referral_commission_percent?: number
+          referral_id?: string | null
+          referral_paid?: boolean
+          referral_paid_at?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          base_price_cents?: number
           birth_date?: string
           birth_place?: string
           birth_time?: string | null
@@ -86,15 +107,57 @@ export type Database = {
           country?: string | null
           created_at?: string
           customer_name?: string
+          discount_amount_cents?: number
+          discount_percent?: number
           email?: string
+          final_price_cents?: number
           first_name?: string | null
           id?: string
           last_name?: string | null
           note?: string | null
           product_id?: string
           product_name?: string
+          referral_code?: string | null
+          referral_commission_cents?: number
+          referral_commission_percent?: number
+          referral_id?: string | null
+          referral_paid?: boolean
+          referral_paid_at?: string | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          code: string
+          commission_percent: number
+          created_at: string
+          discount_percent: number
+          id: string
+          is_active: boolean
+          owner_first_name: string
+          owner_last_name: string
+        }
+        Insert: {
+          code: string
+          commission_percent?: number
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          owner_first_name: string
+          owner_last_name: string
+        }
+        Update: {
+          code?: string
+          commission_percent?: number
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          owner_first_name?: string
+          owner_last_name?: string
         }
         Relationships: []
       }

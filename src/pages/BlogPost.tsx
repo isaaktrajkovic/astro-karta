@@ -6,17 +6,17 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import OrderDialog from '@/components/OrderDialog';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
-const productData: Record<string, { titleSr: string; titleEn: string }> = {
-  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package' },
-  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package' },
-  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report' },
-  'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis' },
-  'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report' },
-  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)' },
-  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)' },
-  'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation' },
-  'physical-talisman': { titleSr: 'Talisman set', titleEn: 'Talisman Set' },
-  'physical-crystal': { titleSr: 'Premium kristal set', titleEn: 'Premium Crystal Set' },
+const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
+  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 500 },
+  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package', priceCents: 1000 },
+  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
+  'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
+  'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },
+  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 600 },
+  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', priceCents: 1200 },
+  'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation', priceCents: 1500 },
+  'physical-talisman': { titleSr: 'Talisman set', titleEn: 'Talisman Set', priceCents: 3000 },
+  'physical-crystal': { titleSr: 'Premium kristal set', titleEn: 'Premium Crystal Set', priceCents: 4000 },
 };
 
 interface BlogPostData {
@@ -317,6 +317,7 @@ const BlogPost = () => {
   const content = language === 'sr' ? post.contentSr : post.contentEn;
   const productInfo = post.productId ? productData[post.productId] : null;
   const productName = productInfo ? (language === 'sr' ? productInfo.titleSr : productInfo.titleEn) : '';
+  const productPriceCents = productInfo?.priceCents || 0;
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -443,6 +444,7 @@ const BlogPost = () => {
               onOpenChange={setIsDialogOpen}
               productId={post.productId}
               productName={productName}
+              priceCents={productPriceCents}
             />
           )}
         </div>
