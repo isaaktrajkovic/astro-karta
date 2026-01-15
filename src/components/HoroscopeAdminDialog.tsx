@@ -44,6 +44,8 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [sendHourEdits, setSendHourEdits] = useState<Record<string, string>>({});
   const [savingSendHourId, setSavingSendHourId] = useState<string | null>(null);
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<'all' | 'sent' | 'failed'>('all');
+  const [deliveryDateFilter, setDeliveryDateFilter] = useState<'all' | 'today'>('all');
   const [testForm, setTestForm] = useState({
     email: '',
     zodiacSign: 'aries',
@@ -233,6 +235,32 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
     if (subscriptionStatusFilter === 'all') return subscriptions;
     return subscriptions.filter((subscription) => subscription.status === subscriptionStatusFilter);
   }, [subscriptions, subscriptionStatusFilter]);
+
+  const filteredDeliveries = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let result = deliveries;
+    if (deliveryDateFilter === 'today') {
+      result = result.filter((delivery) => new Date(delivery.created_at) >= startOfToday);
+    }
+    if (deliveryStatusFilter !== 'all') {
+      result = result.filter((delivery) => delivery.status === deliveryStatusFilter);
+    }
+    return result;
+  }, [deliveries, deliveryDateFilter, deliveryStatusFilter]);
+
+  const toggleSubscriptionFilter = (status: string) => {
+    setSubscriptionStatusFilter((prev) => (prev === status ? 'all' : status));
+  };
+
+  const toggleDeliveryFilter = (status: 'sent' | 'failed') => {
+    const isActive = deliveryStatusFilter === status && deliveryDateFilter === 'today';
+    setDeliveryStatusFilter(isActive ? 'all' : status);
+    setDeliveryDateFilter(isActive ? 'all' : 'today');
+  };
+
+  const getMetricTileClass = (active: boolean) =>
+    `p-4 bg-card border border-border rounded-lg cursor-pointer ${active ? 'ring-2 ring-primary/40' : ''}`;
 
   const handleCancelSubscription = async (subscriptionId: string) => {
     const confirmed = window.confirm(
@@ -487,31 +515,46 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
-          <div className="p-4 bg-card border border-border rounded-lg">
+          <div
+            className={getMetricTileClass(subscriptionStatusFilter === 'active')}
+            onClick={() => toggleSubscriptionFilter('active')}
+          >
             <div className="text-2xl font-bold text-primary">{metrics.activeCount}</div>
             <div className="text-xs text-muted-foreground">
               {language === 'sr' ? 'Aktivne pretplate' : 'Active subscriptions'}
             </div>
           </div>
-          <div className="p-4 bg-card border border-border rounded-lg">
+          <div
+            className={getMetricTileClass(deliveryStatusFilter === 'sent' && deliveryDateFilter === 'today')}
+            onClick={() => toggleDeliveryFilter('sent')}
+          >
             <div className="text-2xl font-bold text-green-400">{metrics.sentTodayCount}</div>
             <div className="text-xs text-muted-foreground">
               {language === 'sr' ? 'Poslato danas' : 'Sent today'}
             </div>
           </div>
-          <div className="p-4 bg-card border border-border rounded-lg">
+          <div
+            className={getMetricTileClass(deliveryStatusFilter === 'failed' && deliveryDateFilter === 'today')}
+            onClick={() => toggleDeliveryFilter('failed')}
+          >
             <div className="text-2xl font-bold text-red-400">{metrics.failedTodayCount}</div>
             <div className="text-xs text-muted-foreground">
               {language === 'sr' ? 'Neuspešno danas' : 'Failed today'}
             </div>
           </div>
-          <div className="p-4 bg-card border border-border rounded-lg">
+          <div
+            className={getMetricTileClass(subscriptionStatusFilter === 'unsubscribed')}
+            onClick={() => toggleSubscriptionFilter('unsubscribed')}
+          >
             <div className="text-2xl font-bold text-muted-foreground">{metrics.unsubscribedCount}</div>
             <div className="text-xs text-muted-foreground">
               {language === 'sr' ? 'Odjavljeni' : 'Unsubscribed'}
             </div>
           </div>
-          <div className="p-4 bg-card border border-border rounded-lg">
+          <div
+            className={getMetricTileClass(subscriptionStatusFilter === 'completed')}
+            onClick={() => toggleSubscriptionFilter('completed')}
+          >
             <div className="text-2xl font-bold text-blue-400">{metrics.completedCount}</div>
             <div className="text-xs text-muted-foreground">
               {language === 'sr' ? 'Završene' : 'Completed'}
@@ -646,13 +689,13 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
               <div className="p-6 text-sm text-muted-foreground">
                 {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
               </div>
-            ) : deliveries.length === 0 ? (
+            ) : filteredDeliveries.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">
                 {language === 'sr' ? 'Nema logova' : 'No delivery logs'}
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {deliveries.map((delivery) => (
+                {filteredDeliveries.map((delivery) => (
                   <div key={delivery.id} className="p-4 flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-3 text-sm">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${getStatusStyle(delivery.status)}`}>
