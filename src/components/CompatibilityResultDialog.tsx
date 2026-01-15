@@ -315,7 +315,7 @@ const CompatibilityResultDialog = ({
                       }}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      {t('compatibility.upsell.cta')} - 10€
+                      {t('compatibility.upsell.cta')} - 150€
                     </Button>
                   </div>
                 </div>
@@ -329,8 +329,8 @@ const CompatibilityResultDialog = ({
       <OrderDialog
         open={showOrderDialog}
         onOpenChange={setShowOrderDialog}
-        productId="report-love"
-        productName={t('reports.love.title')}
+        productId="report-synastry"
+        productName={t('reports.synastry.title')}
       />
     </>
   );

@@ -159,12 +159,12 @@ export const translations: Translations = {
     ru: 'Ежемесячная подписка на ежедневный гороскоп' 
   },
   'products.reports': { 
-    sr: 'Digitalni astro-izveštaji', 
-    en: 'Digital Astro Reports', 
-    fr: 'Rapports astro numériques', 
-    de: 'Digitale Astro-Berichte', 
-    es: 'Informes astro digitales', 
-    ru: 'Цифровые астро-отчеты' 
+    sr: 'Astrološki izveštaji', 
+    en: 'Astrological Reports', 
+    fr: 'Rapports astrologiques', 
+    de: 'Astrologische Berichte', 
+    es: 'Informes astrológicos', 
+    ru: 'Астрологические отчеты' 
   },
   'products.consultations': { 
     sr: 'Brze konsultacije', 
@@ -207,12 +207,12 @@ export const translations: Translations = {
     ru: 'Базовый или премиальный ежедневный гороскоп для вашего знака' 
   },
   'products.reports.desc': { 
-    sr: 'Detaljni tematski izveštaji', 
-    en: 'Detailed thematic reports', 
-    fr: 'Rapports thématiques détaillés', 
-    de: 'Detaillierte thematische Berichte', 
-    es: 'Informes temáticos detallados', 
-    ru: 'Детальные тематические отчеты' 
+    sr: 'Detaljni astrološki izveštaji i analize', 
+    en: 'Detailed astrological reports and analyses', 
+    fr: 'Rapports et analyses astrologiques détaillés', 
+    de: 'Detaillierte astrologische Berichte und Analysen', 
+    es: 'Informes y análisis astrológicos detallados', 
+    ru: 'Подробные астрологические отчеты и анализы' 
   },
   'products.consultations.desc': { 
     sr: 'Brzi astrološki odgovori', 
@@ -274,53 +274,85 @@ export const translations: Translations = {
   },
 
   // Reports
+  'reports.natal.title': { 
+    sr: 'Analiza natalne karte', 
+    en: 'Natal Chart Analysis', 
+    fr: 'Analyse du thème natal', 
+    de: 'Analyse des Geburtshoroskops', 
+    es: 'Análisis de la carta natal', 
+    ru: 'Анализ натальной карты' 
+  },
+  'reports.natal.desc': { 
+    sr: 'Natalna karta pokazuje naše talente, izazove, emotivne obrasce, način razmišljanja, odnose, karijeru i životni put. Detaljna analiza natalne karte pomaže u boljem razumevanju sebe, sopstvenih izbora i pravca u kom se život razvija.', 
+    en: 'The natal chart reveals talents, challenges, emotional patterns, mindset, relationships, career, and life path. A detailed analysis helps you understand yourself, your choices, and the direction your life is taking.', 
+    fr: 'Le thème natal révèle talents, défis, schémas émotionnels, façon de penser, relations, carrière et chemin de vie. Une analyse détaillée aide à mieux se comprendre et à clarifier ses choix.', 
+    de: 'Das Geburtshoroskop zeigt Talente, Herausforderungen, emotionale Muster, Denkweise, Beziehungen, Karriere und Lebensweg. Eine detaillierte Analyse hilft, sich selbst und die eigenen Entscheidungen besser zu verstehen.', 
+    es: 'La carta natal revela talentos, desafíos, patrones emocionales, forma de pensar, relaciones, carrera y rumbo de vida. Un análisis detallado ayuda a comprenderte mejor y a orientar tus decisiones.', 
+    ru: 'Натальная карта показывает таланты, вызовы, эмоциональные модели, мышление, отношения, карьеру и жизненный путь. Подробный анализ помогает лучше понять себя и направление жизни.' 
+  },
   'reports.yearly.title': { 
-    sr: 'Godišnji astro izveštaj', 
-    en: 'Annual Astro Report', 
-    fr: 'Rapport astro annuel', 
-    de: 'Jährlicher Astro-Bericht', 
-    es: 'Informe astro anual', 
-    ru: 'Годовой астро-отчет' 
+    sr: 'Godišnja Astro analiza natalne karte', 
+    en: 'Yearly Natal Chart Astro Analysis', 
+    fr: 'Analyse annuelle du thème natal', 
+    de: 'Jahresanalyse des Geburtshoroskops', 
+    es: 'Análisis anual de la carta natal', 
+    ru: 'Годовой астроанализ натальной карты' 
   },
   'reports.yearly.desc': { 
-    sr: 'Kompletna analiza vaše godine sa svim važnim tranzitima i periodima', 
-    en: 'Complete analysis of your year with all important transits and periods', 
-    fr: 'Analyse complète de votre année avec tous les transits et périodes importants', 
-    de: 'Vollständige Analyse Ihres Jahres mit allen wichtigen Transiten und Perioden', 
-    es: 'Análisis completo de tu año con todos los tránsitos y períodos importantes', 
-    ru: 'Полный анализ вашего года со всеми важными транзитами и периодами' 
+    sr: 'Godišnja analiza ili godišnji horoskop je opšti pregled godine na osnovu tranzita planeta kroz tvoj natalni horoskop. Pokazuje ti šta će ti biti u fokusu te godine (ljubav, posao, zdravlje, lični razvoj...), koje prilike će se otvarati i na šta treba da obratiš pažnju.', 
+    en: 'The yearly analysis or yearly horoscope is a general overview of the year based on planetary transits through your natal chart. It shows what will be in focus (love, work, health, personal growth...), which opportunities may open, and what to pay attention to.', 
+    fr: 'L’analyse annuelle, ou horoscope annuel, est un aperçu de l’année basé sur les transits planétaires dans votre thème natal. Elle montre ce qui sera au centre (amour, travail, santé, développement personnel...) et où porter votre attention.', 
+    de: 'Die Jahresanalyse ist ein Überblick über das Jahr anhand der Planetentransite in Ihrem Geburtshoroskop. Sie zeigt Schwerpunkte (Liebe, Arbeit, Gesundheit, persönliche Entwicklung...) sowie Chancen und worauf Sie achten sollten.', 
+    es: 'El análisis anual es una visión general del año basada en los tránsitos planetarios por tu carta natal. Muestra qué estará en foco (amor, trabajo, salud, crecimiento personal...) y qué oportunidades pueden abrirse.', 
+    ru: 'Годовой анализ — это общий обзор года на основе транзитов планет по вашей натальной карте. Он показывает ключевые темы (любовь, работа, здоровье, развитие...) и на что стоит обратить внимание.' 
   },
-  'reports.love.title': { 
-    sr: 'Ljubavna analiza', 
-    en: 'Love Analysis', 
-    fr: 'Analyse amoureuse', 
-    de: 'Liebesanalyse', 
-    es: 'Análisis de amor', 
-    ru: 'Анализ любви' 
+  'reports.solar.title': { 
+    sr: 'Solarni horoskop', 
+    en: 'Solar Return Horoscope', 
+    fr: 'Horoscope solaire', 
+    de: 'Solarhoroskop', 
+    es: 'Horóscopo solar', 
+    ru: 'Солярный гороскоп' 
   },
-  'reports.love.desc': { 
-    sr: 'Kompatibilnost i ljubavni potencijal između dva horoskopa', 
-    en: 'Compatibility and love potential between two horoscopes', 
-    fr: 'Compatibilité et potentiel amoureux entre deux horoscopes', 
-    de: 'Kompatibilität und Liebespotenzial zwischen zwei Horoskopen', 
-    es: 'Compatibilidad y potencial amoroso entre dos horóscopos', 
-    ru: 'Совместимость и любовный потенциал между двумя гороскопами' 
+  'reports.solar.desc': { 
+    sr: 'Solarni horoskop je lični horoskop koji se gleda od rođendana do rođendana. Radi se za tačan trenutak kada se Sunce vrati na isti stepen na kom je bilo u tvom natalu. Solar ti pokazuje kakva će ti biti ta godina na ličnom planu, kakve promene i prekretnice su moguće. Solar je konkretniji i precizniji od godišnjeg horoskopa.', 
+    en: 'A personal horoscope from birthday to birthday, calculated for the exact moment the Sun returns to the same degree as in your natal chart. It shows the year’s themes, changes, and turning points. It is more concrete and precise than the yearly horoscope.', 
+    fr: 'Un horoscope personnel de date d’anniversaire à date d’anniversaire, calculé au moment exact où le Soleil revient au même degré. Il montre les thèmes, changements et tournants possibles de l’année. Il est plus concret et précis que l’horoscope annuel.', 
+    de: 'Ein persönliches Horoskop von Geburtstag zu Geburtstag, berechnet für den exakten Moment der Sonnenrückkehr. Es zeigt Themen, Veränderungen und mögliche Wendepunkte des Jahres und ist konkreter als der Jahresausblick.', 
+    es: 'Un horóscopo personal de cumpleaños a cumpleaños, calculado en el momento exacto en que el Sol regresa al mismo grado natal. Muestra temas, cambios y posibles giros del año. Es más concreto que el horóscopo anual.', 
+    ru: 'Личный гороскоп от дня рождения до дня рождения, рассчитанный на момент возвращения Солнца в тот же градус. Он показывает темы, изменения и возможные поворотные моменты года и более точен, чем годовой прогноз.' 
   },
-  'reports.career.title': { 
-    sr: 'Finansijski izveštaj', 
-    en: 'Financial Report', 
-    fr: 'Rapport financier', 
-    de: 'Finanzbericht', 
-    es: 'Informe financiero', 
-    ru: 'Финансовый отчет' 
+  'reports.synastry.title': { 
+    sr: 'Uporedni horoskop i Sinastrija', 
+    en: 'Relationship Horoscope & Synastry', 
+    fr: 'Horoscope comparé et synastrie', 
+    de: 'Partnerhoroskop und Synastrie', 
+    es: 'Horóscopo comparativo y sinastría', 
+    ru: 'Сравнительный гороскоп и синастрия' 
   },
-  'reports.career.desc': { 
-    sr: 'Analiza karijere i finansijskog potencijala u vašoj natalnoj karti', 
-    en: 'Career and financial potential analysis in your natal chart', 
-    fr: 'Analyse du potentiel de carrière et financier dans votre thème natal', 
-    de: 'Karriere- und Finanzpotenzialanalyse in Ihrem Geburtshoroskop', 
-    es: 'Análisis del potencial profesional y financiero en tu carta natal', 
-    ru: 'Анализ карьерного и финансового потенциала в вашей натальной карте' 
+  'reports.synastry.desc': { 
+    sr: 'Detaljna astrološka analiza odnosa između dve osobe. Pokazuje kako se dve osobe međusobno doživljavaju, gde postoji sklad, a gde tenzija, i da li postoji potencijal za vezu, brak, saradnju ili karmički odnos. Posmatraju se aspekti između planeta obe natalne karte, emotivne i psihološke veze. Ova analiza daje odgovor na pitanja zašto se dve osobe snažno privlače, gde postoji sklad a gde izazovi, u kom pravcu odnos može da se razvija i da li je odnos karmički.', 
+    en: 'A detailed astrological analysis of the relationship between two people. It shows how they perceive each other, where harmony and tension exist, and whether there is potential for a relationship, marriage, cooperation, or a karmic bond. It examines aspects between both natal charts and emotional/psychological ties.', 
+    fr: 'Une analyse astrologique détaillée de la relation entre deux personnes. Elle montre la perception mutuelle, où se trouvent l’harmonie et les tensions, et s’il existe un potentiel de relation, mariage, collaboration ou lien karmique. Elle étudie les aspects entre les deux thèmes natals et les liens émotionnels.', 
+    de: 'Eine detaillierte astrologische Analyse der Beziehung zwischen zwei Personen. Sie zeigt Wahrnehmung, Harmonie und Spannung sowie das Potenzial für Beziehung, Ehe, Zusammenarbeit oder karmische Verbindung. Analysiert werden die Aspekte zwischen beiden Geburtshoroskopen und die emotionalen Bindungen.', 
+    es: 'Un análisis astrológico detallado de la relación entre dos personas. Muestra cómo se perciben, dónde hay armonía y tensión y si existe potencial de relación, matrimonio, colaboración o vínculo kármico. Analiza los aspectos entre ambas cartas natales.', 
+    ru: 'Подробный астрологический анализ отношений между двумя людьми. Он показывает, как они воспринимают друг друга, где есть гармония и напряжение и есть ли потенциал для отношений, брака, сотрудничества или кармической связи.' 
+  },
+  'reports.questions.title': { 
+    sr: 'Pojedinačna Astro pitanja (ljubav, zdravlje, posao..)', 
+    en: 'Single Astro Questions (love, health, work...)', 
+    fr: 'Questions astro individuelles (amour, santé, travail...)', 
+    de: 'Einzelne Astro-Fragen (Liebe, Gesundheit, Beruf...)', 
+    es: 'Preguntas astro individuales (amor, salud, trabajo...)', 
+    ru: 'Индивидуальные астрологические вопросы (любовь, здоровье, работа...)' 
+  },
+  'reports.questions.desc': { 
+    sr: 'Ova usluga omogućava ti brz i precizan astrološki odgovor na jedno konkretno pitanje iz oblasti ljubavi, karijere ili zdravlja. Na osnovu tvoje natalne karte i analize tranzita dobićeš jasan uvid u situaciju, savete i smernice za donošenje odluka.', 
+    en: 'This service provides a quick and precise astrological answer to one specific question in love, career, or health. Based on your natal chart and transit analysis, you receive clear insight and guidance for decisions.', 
+    fr: 'Ce service offre une réponse astrologique rapide et précise à une question précise sur l’amour, la carrière ou la santé. Basée sur votre thème natal et les transits, elle apporte des conseils clairs.', 
+    de: 'Dieser Service liefert eine schnelle und präzise astrologische Antwort auf eine konkrete Frage zu Liebe, Karriere oder Gesundheit. Basierend auf Geburtshoroskop und Transiten erhalten Sie klare Hinweise.', 
+    es: 'Este servicio ofrece una respuesta astrológica rápida y precisa a una pregunta concreta sobre amor, carrera o salud. Basado en tu carta natal y los tránsitos, recibes orientación clara.', 
+    ru: 'Эта услуга дает быстрый и точный ответ на один конкретный вопрос о любви, карьере или здоровье. На основе натальной карты и транзитов вы получите четкие рекомендации.' 
   },
   'reports.bundle': { 
     sr: '3 izveštaja po ceni 2', 
@@ -845,12 +877,12 @@ export const translations: Translations = {
     ru: 'Это лишь базовый обзор. Для точности нужен полный анализ натальных карт обоих партнеров.'
   },
   'compatibility.upsell.cta': {
-    sr: 'Naruči Ljubavnu analizu',
-    en: 'Order Love Analysis',
-    fr: 'Commander l\'analyse amoureuse',
-    de: 'Liebesanalyse bestellen',
-    es: 'Pedir análisis de amor',
-    ru: 'Заказать анализ любви'
+    sr: 'Naruči Uporedni horoskop',
+    en: 'Order Relationship Horoscope',
+    fr: 'Commander l\'horoscope comparé',
+    de: 'Partnerhoroskop bestellen',
+    es: 'Pedir horóscopo comparativo',
+    ru: 'Заказать сравнительный гороскоп'
   },
   'compatibility.desc.default': {
     sr: 'Vaši znakovi imaju jedinstvenu dinamiku koja može stvoriti duboku vezu uz malo truda i razumevanja.',

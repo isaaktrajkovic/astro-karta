@@ -30,24 +30,38 @@ const Products = () => {
 
   const reports = [
     {
+      id: 'report-natal',
+      title: t('reports.natal.title'),
+      description: t('reports.natal.desc'),
+      price: '110€',
+      image: reportImage,
+    },
+    {
       id: 'report-yearly',
       title: t('reports.yearly.title'),
       description: t('reports.yearly.desc'),
-      price: '15€',
+      price: '70€',
       image: reportImage,
     },
     {
-      id: 'report-love',
-      title: t('reports.love.title'),
-      description: t('reports.love.desc'),
-      price: '10€',
+      id: 'report-solar',
+      title: t('reports.solar.title'),
+      description: t('reports.solar.desc'),
+      price: '90€',
       image: reportImage,
     },
     {
-      id: 'report-career',
-      title: t('reports.career.title'),
-      description: t('reports.career.desc'),
-      price: '12€',
+      id: 'report-synastry',
+      title: t('reports.synastry.title'),
+      description: t('reports.synastry.desc'),
+      price: '150€',
+      image: reportImage,
+    },
+    {
+      id: 'report-questions',
+      title: t('reports.questions.title'),
+      description: t('reports.questions.desc'),
+      price: '35€',
       image: reportImage,
     },
   ];
@@ -127,9 +141,6 @@ const Products = () => {
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">
             {t('products.reports')}
           </h2>
-          <div className="inline-block bg-accent/20 text-accent px-4 py-2 rounded-full text-sm font-medium mb-8">
-            🎁 {t('reports.bundle')}
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {reports.map((product) => (
               <ProductCard key={product.id} {...product} />
