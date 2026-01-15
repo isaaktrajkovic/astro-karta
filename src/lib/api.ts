@@ -32,6 +32,7 @@ export interface Order {
   referral_commission_percent: number;
   referral_commission_cents: number;
   referral_paid: boolean;
+  referral_paid_cents: number;
   referral_paid_at: string | null;
   status: string;
   created_at: string;
@@ -51,6 +52,7 @@ export type CreateOrderPayload = Omit<
   | 'referral_commission_percent'
   | 'referral_commission_cents'
   | 'referral_paid'
+  | 'referral_paid_cents'
   | 'referral_paid_at'
 > & {
   language?: string;
@@ -124,6 +126,7 @@ export interface ReferralOrder {
   final_price_cents: number;
   referral_commission_cents: number;
   referral_paid: boolean;
+  referral_paid_cents: number;
   referral_paid_at: string | null;
   status: string;
   created_at: string;
@@ -313,12 +316,18 @@ export const getReferralOrders = (referralId: number) =>
     auth: true,
   });
 
-export const updateOrderReferralPaid = (orderId: number, paid: boolean) =>
-  request<{ success: true }>(`/api/orders/${orderId}/referral-paid`, {
-    method: 'PATCH',
-    auth: true,
-    body: JSON.stringify({ paid }),
-  });
+export const updateOrderReferralPaid = (
+  orderId: number,
+  payload: { paid?: boolean; paid_cents?: number }
+) =>
+  request<{ success: true; paid_cents?: number; is_paid?: boolean }>(
+    `/api/orders/${orderId}/referral-paid`,
+    {
+      method: 'PATCH',
+      auth: true,
+      body: JSON.stringify(payload),
+    }
+  );
 
 export const trackUsage = (payload: Pick<CalculatorUsage, 'sign1' | 'sign2' | 'compatibility'>) =>
   request<{ success: true }>('/api/usage', {

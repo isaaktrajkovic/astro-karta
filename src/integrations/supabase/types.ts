@@ -64,6 +64,7 @@ export type Database = {
           referral_commission_percent: number
           referral_id: string | null
           referral_paid: boolean
+          referral_paid_cents: number
           referral_paid_at: string | null
           status: string
           updated_at: string
@@ -93,6 +94,7 @@ export type Database = {
           referral_commission_percent?: number
           referral_id?: string | null
           referral_paid?: boolean
+          referral_paid_cents?: number
           referral_paid_at?: string | null
           status?: string
           updated_at?: string
@@ -122,6 +124,7 @@ export type Database = {
           referral_commission_percent?: number
           referral_id?: string | null
           referral_paid?: boolean
+          referral_paid_cents?: number
           referral_paid_at?: string | null
           status?: string
           updated_at?: string

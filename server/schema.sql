@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS orders (
   final_price_cents INT NOT NULL DEFAULT 0,
   referral_commission_percent INT NOT NULL DEFAULT 0,
   referral_commission_cents INT NOT NULL DEFAULT 0,
+  referral_paid_cents INT NOT NULL DEFAULT 0,
   referral_paid BOOLEAN NOT NULL DEFAULT FALSE,
   referral_paid_at TIMESTAMPTZ NULL,
   status TEXT NOT NULL DEFAULT 'pending',

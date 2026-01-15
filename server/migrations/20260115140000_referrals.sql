@@ -18,8 +18,14 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS final_price_cents INT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS referral_commission_percent INT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS referral_commission_cents INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_paid_cents INT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS referral_paid BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS referral_paid_at TIMESTAMPTZ NULL;
 
 CREATE INDEX IF NOT EXISTS orders_referral_idx
   ON orders (referral_id);
+
+UPDATE orders
+SET referral_paid_cents = referral_commission_cents
+WHERE referral_paid = TRUE
+  AND referral_paid_cents = 0;

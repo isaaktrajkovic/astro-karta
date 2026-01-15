@@ -115,6 +115,7 @@ const Dashboard = () => {
   const [referralOrdersLoading, setReferralOrdersLoading] = useState(false);
   const [referralOrdersDialogOpen, setReferralOrdersDialogOpen] = useState(false);
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
+  const [referralPaidEdits, setReferralPaidEdits] = useState<Record<number, string>>({});
   const [referralForm, setReferralForm] = useState({
     code: '',
     ownerFirstName: '',
@@ -278,11 +279,21 @@ const Dashboard = () => {
   const handleOpenReferralOrders = async (referral: Referral) => {
     setSelectedReferral(referral);
     setReferralOrders([]);
+    setReferralPaidEdits({});
     setReferralOrdersDialogOpen(true);
     setReferralOrdersLoading(true);
     try {
       const { orders } = await getReferralOrders(referral.id);
-      setReferralOrders(orders || []);
+      const nextOrders = orders || [];
+      setReferralOrders(nextOrders);
+      const edits: Record<number, string> = {};
+      nextOrders.forEach((order) => {
+        const paidCents = Number(order.referral_paid_cents || 0);
+        const value = paidCents / 100;
+        const hasDecimals = paidCents % 100 !== 0;
+        edits[order.id] = value.toFixed(hasDecimals ? 2 : 0);
+      });
+      setReferralPaidEdits(edits);
     } catch (error) {
       console.error('Error fetching referral orders:', error);
       toast({
@@ -303,19 +314,173 @@ const Dashboard = () => {
       setSelectedReferral(null);
       setReferralOrders([]);
       setReferralOrdersLoading(false);
+      setReferralPaidEdits({});
     }
   };
 
-  const handleMarkReferralPaid = async (orderId: number) => {
+  const parseAmountToCents = (value: string) => {
+    const normalized = value.replace(',', '.').trim();
+    if (!normalized) return null;
+    const numeric = Number(normalized);
+    if (!Number.isFinite(numeric)) return null;
+    return Math.max(0, Math.round(numeric * 100));
+  };
+
+  const exportReferralReport = () => {
+    if (!selectedReferral) return;
+    if (!referralOrders.length) {
+      toast({
+        title: language === 'sr' ? 'Upozorenje' : 'Warning',
+        description: language === 'sr'
+          ? 'Nema porudžbina za izvoz.'
+          : 'No orders to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const toNumber = (cents: number) => Number((cents / 100).toFixed(2));
+    const summaryMap = new Map<string, {
+      product_name: string;
+      order_count: number;
+      total_revenue_cents: number;
+      total_commission_cents: number;
+      paid_cents: number;
+    }>();
+
+    referralOrders.forEach((order) => {
+      const existing = summaryMap.get(order.product_name) || {
+        product_name: order.product_name,
+        order_count: 0,
+        total_revenue_cents: 0,
+        total_commission_cents: 0,
+        paid_cents: 0,
+      };
+      existing.order_count += 1;
+      existing.total_revenue_cents += order.final_price_cents || 0;
+      existing.total_commission_cents += order.referral_commission_cents || 0;
+      existing.paid_cents += order.referral_paid_cents || 0;
+      summaryMap.set(order.product_name, existing);
+    });
+
+    const summaryRows = Array.from(summaryMap.values()).map((row) => ({
+      [language === 'sr' ? 'Usluga' : 'Service']: row.product_name,
+      [language === 'sr' ? 'Broj porudžbina' : 'Orders']: row.order_count,
+      [language === 'sr' ? 'Ukupni promet (EUR)' : 'Total revenue (EUR)']: toNumber(row.total_revenue_cents),
+      [language === 'sr' ? 'Ukupna provizija (EUR)' : 'Total commission (EUR)']: toNumber(row.total_commission_cents),
+      [language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)']: toNumber(row.paid_cents),
+      [language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)']: toNumber(
+        Math.max(row.total_commission_cents - row.paid_cents, 0)
+      ),
+    }));
+
+    const orderRows = referralOrders.map((order) => ({
+      [language === 'sr' ? 'Kupac' : 'Customer']: order.customer_name,
+      [language === 'sr' ? 'Proizvod' : 'Product']: order.product_name,
+      [language === 'sr' ? 'Ukupno (EUR)' : 'Total (EUR)']: toNumber(order.final_price_cents || 0),
+      [language === 'sr' ? 'Provizija (EUR)' : 'Commission (EUR)']: toNumber(order.referral_commission_cents || 0),
+      [language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)']: toNumber(order.referral_paid_cents || 0),
+      [language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)']: toNumber(
+        Math.max((order.referral_commission_cents || 0) - (order.referral_paid_cents || 0), 0)
+      ),
+      [language === 'sr' ? 'Status' : 'Status']: getStatusLabel(order.status),
+      [language === 'sr' ? 'Datum' : 'Date']: new Date(order.created_at).toLocaleDateString(
+        language === 'sr' ? 'sr-RS' : 'en-US'
+      ),
+    }));
+
+    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
+    const ordersSheet = XLSX.utils.json_to_sheet(orderRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+    XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Orders');
+    XLSX.writeFile(
+      workbook,
+      `referral_${selectedReferral.code}_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+
+    toast({
+      title: language === 'sr' ? 'Uspešno' : 'Success',
+      description: language === 'sr'
+        ? 'Izveštaj je preuzet.'
+        : 'Report downloaded.',
+    });
+  };
+
+  const handleSaveReferralPaid = async (order: ReferralOrder) => {
+    const inputValue = referralPaidEdits[order.id] ?? '';
+    const paidCents = parseAmountToCents(inputValue);
+    if (paidCents === null) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Unesite validan iznos.'
+          : 'Enter a valid amount.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      await updateOrderReferralPaid(orderId, true);
+      const response = await updateOrderReferralPaid(order.id, { paid_cents: paidCents });
+      const nextPaidCents = response.paid_cents ?? paidCents;
+      const isPaid = response.is_paid ?? (nextPaidCents >= order.referral_commission_cents);
       setReferralOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId
-            ? { ...order, referral_paid: true, referral_paid_at: new Date().toISOString() }
-            : order
+        prev.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                referral_paid_cents: nextPaidCents,
+                referral_paid: isPaid,
+                referral_paid_at: isPaid ? new Date().toISOString() : null,
+              }
+            : item
         )
       );
+      setReferralPaidEdits((prev) => ({
+        ...prev,
+        [order.id]: (nextPaidCents / 100).toFixed(nextPaidCents % 100 === 0 ? 0 : 2),
+      }));
+      fetchReferrals();
+      toast({
+        title: language === 'sr' ? 'Sačuvano' : 'Saved',
+        description: language === 'sr'
+          ? 'Isplata je ažurirana.'
+          : 'Payout updated.',
+      });
+    } catch (error) {
+      console.error('Error updating referral payment:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće ažurirati isplatu.'
+          : 'Could not update payout.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleMarkReferralPaid = async (order: ReferralOrder) => {
+    try {
+      await updateOrderReferralPaid(order.id, { paid: true });
+      setReferralOrders((prev) =>
+        prev.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                referral_paid: true,
+                referral_paid_at: new Date().toISOString(),
+                referral_paid_cents: item.referral_commission_cents,
+              }
+            : item
+        )
+      );
+      setReferralPaidEdits((prev) => ({
+        ...prev,
+        [order.id]: (order.referral_commission_cents / 100).toFixed(
+          order.referral_commission_cents % 100 === 0 ? 0 : 2
+        ),
+      }));
       fetchReferrals();
       toast({
         title: language === 'sr' ? 'Isplaćeno' : 'Paid',
@@ -1312,6 +1477,10 @@ const Dashboard = () => {
                               {formatPrice(referral.total_commission_cents)}
                             </div>
                             <div className="text-xs text-muted-foreground">
+                              {language === 'sr' ? 'Isplaćeno' : 'Paid'}:{' '}
+                              {formatPrice(referral.paid_commission_cents)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
                               {language === 'sr' ? 'Neisplaćeno' : 'Unpaid'}:{' '}
                               {formatPrice(referral.unpaid_commission_cents)}
                             </div>
@@ -1459,6 +1628,16 @@ const Dashboard = () => {
                   : (language === 'sr' ? 'Nema izabranog referala.' : 'No referral selected.')}
               </DialogDescription>
             </DialogHeader>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportReferralReport}
+                disabled={!referralOrders.length}
+              >
+                {language === 'sr' ? 'Preuzmi izveštaj' : 'Download report'}
+              </Button>
+            </div>
 
             {referralOrdersLoading ? (
               <div className="p-8 text-center text-muted-foreground">
@@ -1487,10 +1666,13 @@ const Dashboard = () => {
                         {language === 'sr' ? 'Provizija' : 'Commission'}
                       </th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                        {language === 'sr' ? 'Status' : 'Status'}
+                        {language === 'sr' ? 'Isplaćeno' : 'Paid'}
                       </th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                        {language === 'sr' ? 'Isplata' : 'Payout'}
+                        {language === 'sr' ? 'Preostalo' : 'Remaining'}
+                      </th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
+                        {language === 'sr' ? 'Status' : 'Status'}
                       </th>
                       <th className="text-right p-4 text-sm font-medium text-muted-foreground">
                         {language === 'sr' ? 'Akcije' : 'Actions'}
@@ -1518,38 +1700,62 @@ const Dashboard = () => {
                         <td className="p-4 text-foreground">
                           {formatPrice(order.referral_commission_cents)}
                         </td>
+                        <td className="p-4">
+                          <div className="space-y-1">
+                            <Input
+                              value={referralPaidEdits[order.id] ?? ''}
+                              onChange={(event) =>
+                                setReferralPaidEdits((prev) => ({
+                                  ...prev,
+                                  [order.id]: event.target.value,
+                                }))
+                              }
+                              placeholder="0"
+                              className="h-8 w-24 bg-secondary/50 border-border focus:border-primary"
+                              inputMode="decimal"
+                            />
+                            {order.referral_paid && order.referral_paid_at ? (
+                              <div className="text-xs text-emerald-400">
+                                {language === 'sr' ? 'Isplaćeno' : 'Paid'}{' '}
+                                {new Date(order.referral_paid_at).toLocaleDateString(
+                                  language === 'sr' ? 'sr-RS' : 'en-US'
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">
+                                {language === 'sr' ? 'Nije isplaćeno' : 'Unpaid'}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {formatPrice(
+                            Math.max(
+                              (order.referral_commission_cents || 0) - (order.referral_paid_cents || 0),
+                              0
+                            )
+                          )}
+                        </td>
                         <td className="p-4 text-sm text-muted-foreground">
                           {getStatusLabel(order.status)}
                         </td>
-                        <td className="p-4 text-sm">
-                          {order.referral_paid ? (
-                            <div className="text-emerald-400">
-                              {language === 'sr' ? 'Isplaćeno' : 'Paid'}
-                              {order.referral_paid_at && (
-                                <div className="text-xs text-muted-foreground">
-                                  {new Date(order.referral_paid_at).toLocaleDateString(
-                                    language === 'sr' ? 'sr-RS' : 'en-US'
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">
-                              {language === 'sr' ? 'Nije isplaćeno' : 'Unpaid'}
-                            </span>
-                          )}
-                        </td>
                         <td className="p-4 text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={order.referral_paid}
-                            onClick={() => handleMarkReferralPaid(order.id)}
-                          >
-                            {order.referral_paid
-                              ? (language === 'sr' ? 'Isplaćeno' : 'Paid')
-                              : (language === 'sr' ? 'Označi' : 'Mark paid')}
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSaveReferralPaid(order)}
+                            >
+                              {language === 'sr' ? 'Sačuvaj' : 'Save'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleMarkReferralPaid(order)}
+                            >
+                              {language === 'sr' ? 'Sve' : 'Full'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS orders (
   final_price_cents INT NOT NULL DEFAULT 0,
   referral_commission_percent INT NOT NULL DEFAULT 0,
   referral_commission_cents INT NOT NULL DEFAULT 0,
+  referral_paid_cents INT NOT NULL DEFAULT 0,
   referral_paid TINYINT(1) NOT NULL DEFAULT 0,
   referral_paid_at TIMESTAMP NULL DEFAULT NULL,
   status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',

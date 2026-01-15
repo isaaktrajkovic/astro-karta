@@ -1862,6 +1862,7 @@ app.post('/api/orders', async (req, res) => {
   let finalPriceCents = basePriceCents;
   let commissionPercent = 0;
   let commissionAmountCents = 0;
+  let referralPaidCents = 0;
 
   const normalizedReferralCode = normalizeReferralCode(referral_code);
   if (normalizedReferralCode) {
@@ -1916,9 +1917,10 @@ app.post('/api/orders', async (req, res) => {
         final_price_cents,
         referral_commission_percent,
         referral_commission_cents,
+        referral_paid_cents,
         referral_paid,
         referral_paid_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING id`,
       [
         product_id,
@@ -1944,6 +1946,7 @@ app.post('/api/orders', async (req, res) => {
         finalPriceCents,
         commissionPercent,
         commissionAmountCents,
+        referralPaidCents,
         false,
         null,
       ]
@@ -2037,6 +2040,7 @@ app.get('/api/orders', requireAuth, async (_req, res) => {
         final_price_cents,
         referral_commission_percent,
         referral_commission_cents,
+        referral_paid_cents,
         referral_paid,
         referral_paid_at,
         status,
@@ -2210,9 +2214,9 @@ app.get('/api/referrals', requireAuth, async (_req, res) => {
         r.created_at,
         COUNT(o.id)::int AS order_count,
         COALESCE(SUM(o.final_price_cents), 0)::int AS total_revenue_cents,
-        COALESCE(SUM(o.referral_commission_cents), 0)::int AS total_commission_cents,
-        COALESCE(SUM(CASE WHEN o.referral_paid THEN o.referral_commission_cents ELSE 0 END), 0)::int AS paid_commission_cents,
-        COALESCE(SUM(CASE WHEN o.referral_paid THEN 0 ELSE o.referral_commission_cents END), 0)::int AS unpaid_commission_cents
+        COALESCE(SUM(COALESCE(o.referral_commission_cents, 0)), 0)::int AS total_commission_cents,
+        COALESCE(SUM(COALESCE(o.referral_paid_cents, 0)), 0)::int AS paid_commission_cents,
+        COALESCE(SUM(GREATEST(COALESCE(o.referral_commission_cents, 0) - COALESCE(o.referral_paid_cents, 0), 0)), 0)::int AS unpaid_commission_cents
       FROM referrals r
       LEFT JOIN orders o ON o.referral_id = r.id
       GROUP BY r.id
@@ -2353,6 +2357,7 @@ app.get('/api/referrals/:id/orders', requireAuth, async (req, res) => {
         product_name,
         final_price_cents,
         referral_commission_cents,
+        referral_paid_cents,
         referral_paid,
         referral_paid_at,
         status,
@@ -2379,15 +2384,55 @@ app.patch('/api/orders/:id/referral-paid', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid order id' });
   }
 
-  const { paid } = req.body || {};
-  const isPaid = Boolean(paid);
-  const paidAt = isPaid ? new Date() : null;
+  const { paid, paid_cents } = req.body || {};
 
   try {
+    if (paid_cents !== undefined && paid_cents !== null) {
+      const paidCentsNumber = Number(paid_cents);
+      if (!Number.isFinite(paidCentsNumber)) {
+        return res.status(400).json({ error: 'Invalid paid_cents' });
+      }
+      const normalizedPaidCents = Math.max(0, Math.floor(paidCentsNumber));
+
+      const { rows } = await pool.query(
+        `SELECT referral_commission_cents
+         FROM orders
+         WHERE id = $1
+         LIMIT 1`,
+        [orderId]
+      );
+      const order = rows[0];
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      const commissionCents = Math.max(0, Number(order.referral_commission_cents || 0));
+      const cappedPaidCents = Math.min(normalizedPaidCents, commissionCents);
+      const isPaid = commissionCents > 0 && cappedPaidCents >= commissionCents;
+      const paidAt = isPaid ? new Date() : null;
+
+      await pool.query(
+        `UPDATE orders
+         SET referral_paid = $1,
+             referral_paid_at = $2,
+             referral_paid_cents = $3
+         WHERE id = $4`,
+        [isPaid, paidAt, cappedPaidCents, orderId]
+      );
+
+      return res.json({ success: true, paid_cents: cappedPaidCents, is_paid: isPaid });
+    }
+
+    const isPaid = Boolean(paid);
+    const paidAt = isPaid ? new Date() : null;
     const { rowCount } = await pool.query(
       `UPDATE orders
        SET referral_paid = $1,
-           referral_paid_at = $2
+           referral_paid_at = $2,
+           referral_paid_cents = CASE
+             WHEN $1 THEN referral_commission_cents
+             ELSE 0
+           END
        WHERE id = $3`,
       [isPaid, paidAt, orderId]
     );
