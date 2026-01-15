@@ -545,49 +545,67 @@ const Dashboard = () => {
     const report = getReferralReportData();
     if (!report) return;
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    const pdfFont = await loadPdfFont(doc);
-    const pageWidth = doc.internal.pageSize.getWidth();
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pdfFont = await loadPdfFont(doc);
+      const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 84, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.text('Astro whisper', 40, 40);
-    doc.setFontSize(11);
-    doc.text(report.referralLabel, 40, 62);
+      const autoTableFn = (typeof autoTable === 'function'
+        ? autoTable
+        : (autoTable as unknown as { default?: typeof autoTable })?.default);
+      if (!autoTableFn) {
+        throw new Error('PDF table generator not available');
+      }
 
-    doc.setTextColor(17, 24, 39);
-    doc.setFontSize(13);
-    doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, pageWidth, 84, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.text('Astro whisper', 40, 40);
+      doc.setFontSize(11);
+      doc.text(report.referralLabel, 40, 62);
 
-    autoTable(doc, {
-      startY: 120,
-      head: [report.summaryHeaders],
-      body: report.summaryRows,
-      styles: {
-        font: pdfFont,
-        fontSize: 9,
-        textColor: [15, 23, 42],
-        cellPadding: 6,
-      },
-      headStyles: {
-        fillColor: [30, 41, 59],
-        textColor: [255, 255, 255],
-      },
-      alternateRowStyles: {
-        fillColor: [241, 245, 249],
-      },
-    });
+      doc.setTextColor(17, 24, 39);
+      doc.setFontSize(13);
+      doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
 
-    doc.save(`${report.filename}.pdf`);
+      autoTableFn(doc, {
+        startY: 120,
+        head: [report.summaryHeaders],
+        body: report.summaryRows,
+        styles: {
+          font: pdfFont,
+          fontSize: 9,
+          textColor: [15, 23, 42],
+          cellPadding: 6,
+        },
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+        },
+        alternateRowStyles: {
+          fillColor: [241, 245, 249],
+        },
+      });
 
-    toast({
-      title: language === 'sr' ? 'Uspešno' : 'Success',
-      description: language === 'sr'
-        ? 'PDF izveštaj je preuzet.'
-        : 'PDF report downloaded.',
-    });
+      doc.save(`${report.filename}.pdf`);
+
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr'
+          ? 'PDF izveštaj je preuzet.'
+          : 'PDF report downloaded.',
+      });
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'PDF izveštaj nije mogao da se preuzme.'
+          : 'Could not download PDF report.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSaveReferralPaid = async (order: ReferralOrder) => {
@@ -692,6 +710,7 @@ const Dashboard = () => {
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
+      fetchReferrals();
 
       toast({
         title: language === 'sr' ? 'Uspešno' : 'Success',
@@ -773,6 +792,7 @@ const Dashboard = () => {
             order.id === reportOrder.id ? { ...order, status: 'completed' } : order
           )
         );
+        fetchReferrals();
       } else {
         toast({
           title: language === 'sr' ? 'Upozorenje' : 'Warning',
@@ -986,6 +1006,25 @@ const Dashboard = () => {
       cancelled: 'bg-muted text-muted-foreground',
     };
     return statusStyles[status] || statusStyles.pending;
+  };
+
+  const getReferralOrderStatus = (referral: Referral) => {
+    if (referral.order_count === 0) {
+      return { key: 'none', label: language === 'sr' ? 'Nema' : 'None' };
+    }
+    if (referral.pending_count > 0) {
+      return { key: 'pending', label: getStatusLabel('pending') };
+    }
+    if (referral.processing_count > 0) {
+      return { key: 'processing', label: getStatusLabel('processing') };
+    }
+    if (referral.completed_count === referral.order_count) {
+      return { key: 'completed', label: getStatusLabel('completed') };
+    }
+    if (referral.cancelled_count === referral.order_count) {
+      return { key: 'cancelled', label: getStatusLabel('cancelled') };
+    }
+    return { key: 'mixed', label: language === 'sr' ? 'Mešano' : 'Mixed' };
   };
 
   const getStatusLabel = (status: string) => {
@@ -1643,7 +1682,7 @@ const Dashboard = () => {
                           {language === 'sr' ? 'Provizija' : 'Commission'}
                         </th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                          {language === 'sr' ? 'Status' : 'Status'}
+                          {language === 'sr' ? 'Status porudžbina' : 'Order status'}
                         </th>
                         <th className="text-right p-4 text-sm font-medium text-muted-foreground">
                           {language === 'sr' ? 'Akcije' : 'Actions'}
@@ -1660,6 +1699,11 @@ const Dashboard = () => {
                             <div className="font-medium text-foreground">{referral.code}</div>
                             <div className="text-xs text-muted-foreground">
                               {language === 'sr' ? 'Popust' : 'Discount'}: {referral.discount_percent}%
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {referral.is_active
+                                ? (language === 'sr' ? 'Aktivan' : 'Active')
+                                : (language === 'sr' ? 'Neaktivan' : 'Inactive')}
                             </div>
                           </td>
                           <td className="p-4">
@@ -1690,17 +1734,21 @@ const Dashboard = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
-                                referral.is_active
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-muted text-muted-foreground'
-                              }`}
-                            >
-                              {referral.is_active
-                                ? (language === 'sr' ? 'Aktivan' : 'Active')
-                                : (language === 'sr' ? 'Neaktivan' : 'Inactive')}
-                            </span>
+                            {(() => {
+                              const status = getReferralOrderStatus(referral);
+                              const badgeClass = status.key === 'mixed'
+                                ? 'bg-secondary/60 text-muted-foreground'
+                                : status.key === 'none'
+                                  ? 'bg-muted text-muted-foreground'
+                                  : getStatusBadgeStyles(status.key);
+                              return (
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${badgeClass}`}
+                                >
+                                  {status.label}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">

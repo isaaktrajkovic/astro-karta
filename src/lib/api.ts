@@ -113,6 +113,10 @@ export interface Referral {
   is_active: boolean;
   created_at: string;
   order_count: number;
+  pending_count: number;
+  processing_count: number;
+  completed_count: number;
+  cancelled_count: number;
   total_revenue_cents: number;
   total_commission_cents: number;
   paid_commission_cents: number;
