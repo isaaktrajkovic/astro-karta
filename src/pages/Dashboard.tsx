@@ -6,6 +6,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
 import {
@@ -326,20 +329,11 @@ const Dashboard = () => {
     return Math.max(0, Math.round(numeric * 100));
   };
 
-  const exportReferralReport = () => {
-    if (!selectedReferral) return;
-    if (!referralOrders.length) {
-      toast({
-        title: language === 'sr' ? 'Upozorenje' : 'Warning',
-        description: language === 'sr'
-          ? 'Nema porudžbina za izvoz.'
-          : 'No orders to export.',
-        variant: 'destructive',
-      });
-      return;
+  const getReferralReportData = () => {
+    if (!selectedReferral) {
+      return null;
     }
 
-    const toNumber = (cents: number) => Number((cents / 100).toFixed(2));
     const summaryMap = new Map<string, {
       product_name: string;
       order_count: number;
@@ -363,47 +357,213 @@ const Dashboard = () => {
       summaryMap.set(order.product_name, existing);
     });
 
-    const summaryRows = Array.from(summaryMap.values()).map((row) => ({
-      [language === 'sr' ? 'Usluga' : 'Service']: row.product_name,
-      [language === 'sr' ? 'Broj porudžbina' : 'Orders']: row.order_count,
-      [language === 'sr' ? 'Ukupni promet (EUR)' : 'Total revenue (EUR)']: toNumber(row.total_revenue_cents),
-      [language === 'sr' ? 'Ukupna provizija (EUR)' : 'Total commission (EUR)']: toNumber(row.total_commission_cents),
-      [language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)']: toNumber(row.paid_cents),
-      [language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)']: toNumber(
-        Math.max(row.total_commission_cents - row.paid_cents, 0)
-      ),
-    }));
+    const summaryHeaders = [
+      language === 'sr' ? 'Usluga' : 'Service',
+      language === 'sr' ? 'Broj porudžbina' : 'Orders',
+      language === 'sr' ? 'Ukupni promet (EUR)' : 'Total revenue (EUR)',
+      language === 'sr' ? 'Ukupna provizija (EUR)' : 'Total commission (EUR)',
+      language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)',
+      language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)',
+    ];
 
-    const orderRows = referralOrders.map((order) => ({
-      [language === 'sr' ? 'Kupac' : 'Customer']: order.customer_name,
-      [language === 'sr' ? 'Proizvod' : 'Product']: order.product_name,
-      [language === 'sr' ? 'Ukupno (EUR)' : 'Total (EUR)']: toNumber(order.final_price_cents || 0),
-      [language === 'sr' ? 'Provizija (EUR)' : 'Commission (EUR)']: toNumber(order.referral_commission_cents || 0),
-      [language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)']: toNumber(order.referral_paid_cents || 0),
-      [language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)']: toNumber(
-        Math.max((order.referral_commission_cents || 0) - (order.referral_paid_cents || 0), 0)
-      ),
-      [language === 'sr' ? 'Status' : 'Status']: getStatusLabel(order.status),
-      [language === 'sr' ? 'Datum' : 'Date']: new Date(order.created_at).toLocaleDateString(
-        language === 'sr' ? 'sr-RS' : 'en-US'
-      ),
-    }));
+    const summaryRows = Array.from(summaryMap.values()).map((row) => ([
+      row.product_name,
+      row.order_count,
+      row.total_revenue_cents / 100,
+      row.total_commission_cents / 100,
+      row.paid_cents / 100,
+      Math.max(row.total_commission_cents - row.paid_cents, 0) / 100,
+    ]));
 
-    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
-    const ordersSheet = XLSX.utils.json_to_sheet(orderRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-    XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Orders');
-    XLSX.writeFile(
-      workbook,
-      `referral_${selectedReferral.code}_${new Date().toISOString().split('T')[0]}.xlsx`
-    );
+    const orderHeaders = [
+      language === 'sr' ? 'Kupac' : 'Customer',
+      language === 'sr' ? 'Proizvod' : 'Product',
+      language === 'sr' ? 'Ukupno (EUR)' : 'Total (EUR)',
+      language === 'sr' ? 'Provizija (EUR)' : 'Commission (EUR)',
+      language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)',
+      language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)',
+      language === 'sr' ? 'Status' : 'Status',
+      language === 'sr' ? 'Datum' : 'Date',
+    ];
+
+    const orderRows = referralOrders.map((order) => ([
+      order.customer_name,
+      order.product_name,
+      (order.final_price_cents || 0) / 100,
+      (order.referral_commission_cents || 0) / 100,
+      (order.referral_paid_cents || 0) / 100,
+      Math.max((order.referral_commission_cents || 0) - (order.referral_paid_cents || 0), 0) / 100,
+      getStatusLabel(order.status),
+      new Date(order.created_at).toLocaleDateString(language === 'sr' ? 'sr-RS' : 'en-US'),
+    ]));
+
+    return {
+      summaryHeaders,
+      summaryRows,
+      orderHeaders,
+      orderRows,
+      filename: `referral_${selectedReferral.code}_${new Date().toISOString().split('T')[0]}`,
+      referralLabel: `${selectedReferral.code} • ${selectedReferral.owner_first_name} ${selectedReferral.owner_last_name}`,
+    };
+  };
+
+  const exportReferralExcel = async () => {
+    if (!selectedReferral) return;
+    if (!referralOrders.length) {
+      toast({
+        title: language === 'sr' ? 'Upozorenje' : 'Warning',
+        description: language === 'sr'
+          ? 'Nema porudžbina za izvoz.'
+          : 'No orders to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const report = getReferralReportData();
+    if (!report) return;
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Astro whisper';
+    workbook.created = new Date();
+
+    const applyHeaderStyle = (sheet: ExcelJS.Worksheet) => {
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1F2937' },
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+      headerRow.height = 22;
+    };
+
+    const summarySheet = workbook.addWorksheet('Summary');
+    summarySheet.columns = report.summaryHeaders.map((header, index) => ({
+      header,
+      key: `s${index}`,
+      width: index === 0 ? 32 : 18,
+    }));
+    report.summaryRows.forEach((row) => {
+      summarySheet.addRow(row);
+    });
+    applyHeaderStyle(summarySheet);
+
+    const ordersSheet = workbook.addWorksheet('Orders');
+    ordersSheet.columns = report.orderHeaders.map((header, index) => ({
+      header,
+      key: `o${index}`,
+      width: index === 0 ? 28 : (index === 1 ? 24 : 18),
+    }));
+    report.orderRows.forEach((row) => {
+      ordersSheet.addRow(row);
+    });
+    applyHeaderStyle(ordersSheet);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${report.filename}.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(url);
 
     toast({
       title: language === 'sr' ? 'Uspešno' : 'Success',
       description: language === 'sr'
-        ? 'Izveštaj je preuzet.'
-        : 'Report downloaded.',
+        ? 'Excel izveštaj je preuzet.'
+        : 'Excel report downloaded.',
+    });
+  };
+
+  const exportReferralPdf = () => {
+    if (!selectedReferral) return;
+    if (!referralOrders.length) {
+      toast({
+        title: language === 'sr' ? 'Upozorenje' : 'Warning',
+        description: language === 'sr'
+          ? 'Nema porudžbina za izvoz.'
+          : 'No orders to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const report = getReferralReportData();
+    if (!report) return;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 84, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text('Astro whisper', 40, 40);
+    doc.setFontSize(11);
+    doc.text(report.referralLabel, 40, 62);
+
+    doc.setTextColor(17, 24, 39);
+    doc.setFontSize(13);
+    doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
+
+    autoTable(doc, {
+      startY: 120,
+      head: [report.summaryHeaders],
+      body: report.summaryRows,
+      styles: {
+        fontSize: 9,
+        textColor: [15, 23, 42],
+        cellPadding: 6,
+      },
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: [255, 255, 255],
+      },
+      alternateRowStyles: {
+        fillColor: [241, 245, 249],
+      },
+    });
+
+    const lastSummaryY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 160;
+    let nextY = lastSummaryY + 32;
+    if (nextY > doc.internal.pageSize.getHeight() - 200) {
+      doc.addPage();
+      nextY = 50;
+    }
+
+    doc.setFontSize(13);
+    doc.text(language === 'sr' ? 'Porudžbine' : 'Orders', 40, nextY);
+
+    autoTable(doc, {
+      startY: nextY + 10,
+      head: [report.orderHeaders],
+      body: report.orderRows,
+      styles: {
+        fontSize: 8,
+        textColor: [15, 23, 42],
+        cellPadding: 5,
+      },
+      headStyles: {
+        fillColor: [88, 28, 135],
+        textColor: [255, 255, 255],
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+    });
+
+    doc.save(`${report.filename}.pdf`);
+
+    toast({
+      title: language === 'sr' ? 'Uspešno' : 'Success',
+      description: language === 'sr'
+        ? 'PDF izveštaj je preuzet.'
+        : 'PDF report downloaded.',
     });
   };
 
@@ -1632,10 +1792,18 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exportReferralReport}
+                onClick={exportReferralExcel}
                 disabled={!referralOrders.length}
               >
-                {language === 'sr' ? 'Preuzmi izveštaj' : 'Download report'}
+                {language === 'sr' ? 'Preuzmi Excel' : 'Download Excel'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportReferralPdf}
+                disabled={!referralOrders.length}
+              >
+                {language === 'sr' ? 'Preuzmi PDF' : 'Download PDF'}
               </Button>
             </div>
 
