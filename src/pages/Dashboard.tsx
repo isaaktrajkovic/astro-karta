@@ -8,7 +8,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
 import {
@@ -550,9 +549,12 @@ const Dashboard = () => {
       const pdfFont = await loadPdfFont(doc);
       const pageWidth = doc.internal.pageSize.getWidth();
 
-      const autoTableFn = (typeof autoTable === 'function'
-        ? autoTable
-        : (autoTable as unknown as { default?: typeof autoTable })?.default);
+      const autoTableModule = await import('jspdf-autotable');
+      const autoTableFn =
+        typeof autoTableModule.default === 'function'
+          ? autoTableModule.default
+          : (autoTableModule as unknown as { autoTable?: (doc: jsPDF, options: unknown) => void })
+              .autoTable;
       if (!autoTableFn) {
         throw new Error('PDF table generator not available');
       }
@@ -600,9 +602,11 @@ const Dashboard = () => {
       console.error('Failed to export PDF:', error);
       toast({
         title: language === 'sr' ? 'Greška' : 'Error',
-        description: language === 'sr'
-          ? 'PDF izveštaj nije mogao da se preuzme.'
-          : 'Could not download PDF report.',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr'
+            ? 'PDF izveštaj nije mogao da se preuzme.'
+            : 'Could not download PDF report.'),
         variant: 'destructive',
       });
     }
