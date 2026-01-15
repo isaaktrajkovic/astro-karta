@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -129,6 +129,8 @@ const Dashboard = () => {
   });
   const [referralEditingId, setReferralEditingId] = useState<number | null>(null);
   const [referralSaving, setReferralSaving] = useState(false);
+  const referralFormRef = useRef<HTMLDivElement | null>(null);
+  const referralCodeInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -198,6 +200,16 @@ const Dashboard = () => {
       isActive: referral.is_active,
     });
     setReferralEditingId(referral.id);
+    setTimeout(() => {
+      referralFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      referralCodeInputRef.current?.focus();
+    }, 0);
+    toast({
+      title: language === 'sr' ? 'Izmena' : 'Edit',
+      description: language === 'sr'
+        ? 'Podaci su učitani za izmenu.'
+        : 'Referral loaded for editing.',
+    });
   };
 
   const handleSaveReferral = async () => {
@@ -480,7 +492,44 @@ const Dashboard = () => {
     });
   };
 
-  const exportReferralPdf = () => {
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  };
+
+  const loadPdfFont = async (doc: jsPDF) => {
+    const fontName = 'NotoSans';
+    const fontFile = 'NotoSans-Regular.ttf';
+    const cached = doc.getFontList?.()?.[fontName];
+    if (cached) {
+      doc.setFont(fontName);
+      return fontName;
+    }
+
+    try {
+      const response = await fetch('/fonts/NotoSans-Regular.ttf');
+      if (!response.ok) {
+        throw new Error('Font download failed');
+      }
+      const buffer = await response.arrayBuffer();
+      const base64 = arrayBufferToBase64(buffer);
+      doc.addFileToVFS(fontFile, base64);
+      doc.addFont(fontFile, fontName, 'normal');
+      doc.setFont(fontName);
+      return fontName;
+    } catch (error) {
+      console.error('Failed to load PDF font:', error);
+      doc.setFont('helvetica');
+      return 'helvetica';
+    }
+  };
+
+  const exportReferralPdf = async () => {
     if (!selectedReferral) return;
     if (!referralOrders.length) {
       toast({
@@ -497,6 +546,7 @@ const Dashboard = () => {
     if (!report) return;
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pdfFont = await loadPdfFont(doc);
     const pageWidth = doc.internal.pageSize.getWidth();
 
     doc.setFillColor(15, 23, 42);
@@ -516,6 +566,7 @@ const Dashboard = () => {
       head: [report.summaryHeaders],
       body: report.summaryRows,
       styles: {
+        font: pdfFont,
         fontSize: 9,
         textColor: [15, 23, 42],
         cellPadding: 6,
@@ -526,34 +577,6 @@ const Dashboard = () => {
       },
       alternateRowStyles: {
         fillColor: [241, 245, 249],
-      },
-    });
-
-    const lastSummaryY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 160;
-    let nextY = lastSummaryY + 32;
-    if (nextY > doc.internal.pageSize.getHeight() - 200) {
-      doc.addPage();
-      nextY = 50;
-    }
-
-    doc.setFontSize(13);
-    doc.text(language === 'sr' ? 'Porudžbine' : 'Orders', 40, nextY);
-
-    autoTable(doc, {
-      startY: nextY + 10,
-      head: [report.orderHeaders],
-      body: report.orderRows,
-      styles: {
-        fontSize: 8,
-        textColor: [15, 23, 42],
-        cellPadding: 5,
-      },
-      headStyles: {
-        fillColor: [88, 28, 135],
-        textColor: [255, 255, 255],
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
       },
     });
 
@@ -780,6 +803,26 @@ const Dashboard = () => {
     fetchCalculatorUsage();
     fetchReferrals();
   }, []);
+
+  useEffect(() => {
+    if (!referralOrdersDialogOpen || referralOrders.length === 0 || orders.length === 0) {
+      return;
+    }
+
+    const statusMap = new Map(orders.map((order) => [order.id, order.status]));
+    setReferralOrders((prev) => {
+      let changed = false;
+      const next = prev.map((order) => {
+        const nextStatus = statusMap.get(order.id);
+        if (nextStatus && nextStatus !== order.status) {
+          changed = true;
+          return { ...order, status: nextStatus };
+        }
+        return order;
+      });
+      return changed ? next : prev;
+    });
+  }, [orders, referralOrdersDialogOpen, referralOrders.length]);
 
   // Get unique products for filter
   const uniqueProducts = useMemo(() => {
@@ -1414,7 +1457,7 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-card rounded-xl border border-border p-6">
+            <div ref={referralFormRef} className="bg-card rounded-xl border border-border p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">
                 {referralEditingId
                   ? (language === 'sr' ? 'Izmena referala' : 'Edit referral')
@@ -1427,6 +1470,7 @@ const Dashboard = () => {
                   </Label>
                   <Input
                     id="referral-code"
+                    ref={referralCodeInputRef}
                     value={referralForm.code}
                     onChange={(event) =>
                       setReferralForm((prev) => ({
