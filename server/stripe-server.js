@@ -33,9 +33,17 @@ const horoscopeDurationDays = Number(process.env.HOROSCOPE_DURATION_DAYS || 30);
 const horoscopeSchedulerIntervalMs = Number(process.env.HOROSCOPE_SCHEDULER_INTERVAL_MS || 5 * 60 * 1000);
 const horoscopeSchedulerEnabled = process.env.HOROSCOPE_SCHEDULER_ENABLED !== 'false';
 const horoscopeBatchSize = Number(process.env.HOROSCOPE_BATCH_SIZE || 200);
+const dailyContextUrlTemplates = (process.env.DAILY_CONTEXT_URLS || process.env.DAILY_CONTEXT_URL || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+const dailyContextTimeoutMs = Number(process.env.DAILY_CONTEXT_TIMEOUT_MS || 3500);
+const dailyContextCacheTtlMs = Number(process.env.DAILY_CONTEXT_CACHE_TTL_MS || 6 * 60 * 60 * 1000);
+const dailyContextMaxLen = Number(process.env.DAILY_CONTEXT_MAX_LEN || 800);
 const compatibilityCacheTtlMs = Number(process.env.COMPATIBILITY_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000);
 const compatibilityCacheMax = Number(process.env.COMPATIBILITY_CACHE_MAX || 500);
 const compatibilityCache = new Map();
+const dailyContextCache = new Map();
 
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 
@@ -230,6 +238,68 @@ const horoscopeSectionLabelsByLanguage = {
 };
 
 const zodiacSignKeys = Object.keys(zodiacLabelsByLanguage.sr);
+
+const signPersonaByLanguage = {
+  sr: {
+    aries: 'brz, hrabar, inicijativan; traži izazov i direktnost',
+    taurus: 'stabilan, strpljiv, praktičan; voli sigurnost i ritam',
+    gemini: 'radoznao, komunikativan, fleksibilan; traži ideje i razmenu',
+    cancer: 'emotivan, zaštitnički, intuitivan; traži bliskost i sigurnost',
+    leo: 'ponosan, kreativan, srčan; traži priznanje i toplinu',
+    virgo: 'analitičan, precizan, posvećen; traži red i korisnost',
+    libra: 'diplomatičan, taktičan, estetski; traži ravnotežu i sklad',
+    scorpio: 'intenzivan, dubok, lojalan; traži istinu i transformaciju',
+    sagittarius: 'optimističan, avanturistički, otvoren; traži širinu i slobodu',
+    capricorn: 'ambiciozan, disciplinovan, istrajan; traži rezultate i strukturu',
+    aquarius: 'nezavisan, originalan, human; traži ideje i slobodu',
+    pisces: 'empatičan, maštovit, nežan; traži smisao i povezanost',
+  },
+  en: {
+    aries: 'fast, bold, initiating; seeks challenge and directness',
+    taurus: 'steady, patient, practical; seeks security and rhythm',
+    gemini: 'curious, communicative, flexible; seeks ideas and exchange',
+    cancer: 'emotional, protective, intuitive; seeks closeness and safety',
+    leo: 'proud, creative, warm; seeks recognition and warmth',
+    virgo: 'analytical, precise, devoted; seeks order and usefulness',
+    libra: 'diplomatic, tactful, aesthetic; seeks balance and harmony',
+    scorpio: 'intense, deep, loyal; seeks truth and transformation',
+    sagittarius: 'optimistic, adventurous, open; seeks freedom and expansion',
+    capricorn: 'ambitious, disciplined, persistent; seeks structure and results',
+    aquarius: 'independent, original, humanitarian; seeks ideas and freedom',
+    pisces: 'empathetic, imaginative, gentle; seeks meaning and connection',
+  },
+};
+
+const seasonalFocusByLanguage = {
+  sr: {
+    aries: 'inicijativa, hrabrost, prvi korak',
+    taurus: 'stabilnost, telo, finansije, ritam',
+    gemini: 'komunikacija, učenje, kretanje',
+    cancer: 'emocije, dom, bliskost',
+    leo: 'kreativnost, samopouzdanje, vidljivost',
+    virgo: 'rutina, detalji, zdravlje',
+    libra: 'ravnoteža, odnosi, estetika',
+    scorpio: 'dubina, transformacija, granice',
+    sagittarius: 'širenje, optimizam, putovanja',
+    capricorn: 'disciplina, odgovornost, dugoročno',
+    aquarius: 'inovacije, sloboda, zajednica',
+    pisces: 'intuicija, empatija, oporavak',
+  },
+  en: {
+    aries: 'initiative, courage, first steps',
+    taurus: 'stability, body, finances, rhythm',
+    gemini: 'communication, learning, movement',
+    cancer: 'emotions, home, closeness',
+    leo: 'creativity, confidence, visibility',
+    virgo: 'routine, details, health',
+    libra: 'balance, relationships, aesthetics',
+    scorpio: 'depth, transformation, boundaries',
+    sagittarius: 'expansion, optimism, travel',
+    capricorn: 'discipline, responsibility, long-term goals',
+    aquarius: 'innovation, freedom, community',
+    pisces: 'intuition, empathy, recovery',
+  },
+};
 
 const toBase64Url = (value) => Buffer.from(value).toString('base64url');
 
@@ -877,6 +947,98 @@ const parseJsonFromText = (text) => {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const fillTemplate = (template, params) =>
+  String(template || '').replace(/\{(\w+)\}/g, (_match, key) => encodeURIComponent(params?.[key] ?? ''));
+
+const cleanDailyContext = (value) => {
+  const stripped = String(value || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ');
+  const normalized = stripped.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  return normalized.length > dailyContextMaxLen ? `${normalized.slice(0, dailyContextMaxLen)}…` : normalized;
+};
+
+const getDailyContextCacheKey = (dateKey, language, signKey) => `${dateKey}:${language}:${signKey || 'all'}`;
+
+const extractMetaDescription = (html) => {
+  const patterns = [
+    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return '';
+};
+
+const fetchDailyContextFromUrl = async (url) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), dailyContextTimeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const raw = await response.text();
+    if (!raw) return '';
+
+    try {
+      const parsed = JSON.parse(raw);
+      const candidate = parsed?.text || parsed?.summary || parsed?.data?.text || '';
+      return cleanDailyContext(candidate);
+    } catch {
+      const meta = extractMetaDescription(raw);
+      return cleanDailyContext(meta || raw);
+    }
+  } catch (error) {
+    console.error('Daily context fetch failed:', error);
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const getDailyContext = async ({ dateKey, language, signKey }) => {
+  if (!dailyContextUrlTemplates.length || !dateKey) return null;
+  const cacheKey = getDailyContextCacheKey(dateKey, language, signKey);
+  const cached = dailyContextCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.text;
+  }
+
+  const urls = dailyContextUrlTemplates
+    .map((template) => fillTemplate(template, { date: dateKey, language, sign: signKey || '' }))
+    .filter(Boolean);
+  if (!urls.length) return null;
+
+  const snippets = [];
+  for (const url of urls) {
+    const text = await fetchDailyContextFromUrl(url);
+    if (text) snippets.push(text);
+  }
+
+  const combined = cleanDailyContext(snippets.join(' '));
+  if (!combined) return null;
+
+  dailyContextCache.set(cacheKey, {
+    text: combined,
+    expiresAt: Date.now() + dailyContextCacheTtlMs,
+  });
+  return combined;
+};
+
+const getSignPersona = (signKey, language) => {
+  const map = signPersonaByLanguage[language] || signPersonaByLanguage.en;
+  return map?.[signKey] || '';
+};
+
+const getSeasonalFocus = (dateKey, language) => {
+  const signKey = getZodiacSignFromDateString(dateKey);
+  if (!signKey) return '';
+  const map = seasonalFocusByLanguage[language] || seasonalFocusByLanguage.en;
+  return map?.[signKey] || '';
+};
+
 const buildCompatibilityCacheKey = (sign1, sign2, compatibility, language) => {
   const first = String(sign1 || '').trim().toLowerCase();
   const second = String(sign2 || '').trim().toLowerCase();
@@ -927,6 +1089,7 @@ const generateDailyHoroscope = async ({
   signKey,
   language,
   dateLabel,
+  horoscopeDate,
   plan = 'basic',
   birthTime,
   gender,
@@ -939,6 +1102,11 @@ const generateDailyHoroscope = async ({
   const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
   const normalizedBirthTime = normalizeBirthTime(birthTime);
   const normalizedGender = normalizeGender(gender);
+  const signPersona = getSignPersona(signKey, normalizedLanguage);
+  const seasonalFocus = horoscopeDate ? getSeasonalFocus(horoscopeDate, normalizedLanguage) : '';
+  const dailyContext = horoscopeDate
+    ? await getDailyContext({ dateKey: horoscopeDate, language: normalizedLanguage, signKey })
+    : null;
   const birthTimeLine = normalizedBirthTime
     ? `Birth time (24h): ${normalizedBirthTime}. Use it to adjust the tone and focus, but do NOT mention the time directly.`
     : 'Birth time is not available; do not reference or infer it.';
@@ -948,21 +1116,34 @@ const generateDailyHoroscope = async ({
       : normalizedGender === 'female'
         ? 'Use feminine grammatical gender when the language supports it (especially in Serbian). Do not mention gender explicitly.'
         : 'Use gender-neutral wording and avoid gendered adjectives when possible. Do not mention gender explicitly.';
+  const contextLines = [
+    signPersona ? `Sign personality anchor (do not mention the sign name): ${signPersona}.` : '',
+    seasonalFocus ? `Seasonal focus based on today's date: ${seasonalFocus}.` : '',
+    dailyContext
+      ? `Daily context from online sources (use only if relevant; do not quote or mention sources): ${dailyContext}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const prompt = normalizedPlan === 'premium'
     ? `
 You are an astrologer. Write a detailed daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
+${contextLines}
 ${birthTimeLine}
 ${genderLine}
 Return ONLY a JSON object with keys "work", "health", and "love".
 Each value must contain 3 paragraphs separated by a blank line. Each paragraph should be 2-3 sentences.
-Write in second person, warm and specific.
+Each paragraph must include one concrete scenario and one actionable suggestion.
+Write in second person, warm, specific, and grounded in everyday details.
 Do not mention any zodiac sign names, the ascendant, or the moon sign. Avoid lists and emojis.`
     : `
 You are an astrologer. Write a daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
+${contextLines}
 ${genderLine}
 Return ONLY a JSON object with keys "work", "health", and "love".
-Each value should be a short paragraph of 1-2 sentences, warm, and written in second person.
+Each value should be a short paragraph of 1-2 sentences, warm, specific, and written in second person.
+Include one concrete scenario and one actionable suggestion in each section.
 Do not mention any zodiac sign names and avoid lists or emojis.`;
 
   try {
@@ -1038,6 +1219,7 @@ const getOrCreateDailyHoroscope = async ({ horoscopeDate, signKey, language, dat
     signKey,
     language: normalizedLanguage,
     dateLabel,
+    horoscopeDate,
     plan: 'basic',
     gender: normalizedGender,
   });
@@ -1218,6 +1400,7 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), opt
               signKey: subscription.zodiac_sign,
               language,
               dateLabel,
+              horoscopeDate,
               plan,
               birthTime,
               gender,
