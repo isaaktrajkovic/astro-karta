@@ -108,6 +108,7 @@ const Dashboard = () => {
   const [reportSubject, setReportSubject] = useState('');
   const [reportMessage, setReportMessage] = useState('');
   const [reportIsSending, setReportIsSending] = useState(false);
+  const [ordersCollapsed, setOrdersCollapsed] = useState(false);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
   const [referralOrders, setReferralOrders] = useState<ReferralOrder[]>([]);
@@ -877,24 +878,39 @@ const Dashboard = () => {
                 ({filteredOrders.length})
               </span>
             </h2>
-            {(statusFilter !== 'all' || timeFilter !== 'all' || productFilter !== 'all' || zodiacFilter !== 'all' || genderFilter !== 'all') && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  setStatusFilter('all');
-                  setTimeFilter('all');
-                  setProductFilter('all');
-                  setZodiacFilter('all');
-                  setGenderFilter('all');
-                }}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOrdersCollapsed((prev) => !prev)}
               >
-                {language === 'sr' ? 'Resetuj filtere' : 'Reset filters'}
+                {ordersCollapsed
+                  ? (language === 'sr' ? 'Prikaži narudžbine' : 'Show orders')
+                  : (language === 'sr' ? 'Skupi narudžbine' : 'Collapse orders')}
               </Button>
-            )}
+              {(statusFilter !== 'all' || timeFilter !== 'all' || productFilter !== 'all' || zodiacFilter !== 'all' || genderFilter !== 'all') && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setTimeFilter('all');
+                    setProductFilter('all');
+                    setZodiacFilter('all');
+                    setGenderFilter('all');
+                  }}
+                >
+                  {language === 'sr' ? 'Resetuj filtere' : 'Reset filters'}
+                </Button>
+              )}
+            </div>
           </div>
 
-          {isLoading ? (
+          {ordersCollapsed ? (
+            <div className="p-12 text-center text-muted-foreground">
+              {language === 'sr' ? 'Narudžbine su skupljene.' : 'Orders are collapsed.'}
+            </div>
+          ) : isLoading ? (
             <div className="p-12 text-center text-muted-foreground">
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
               {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
