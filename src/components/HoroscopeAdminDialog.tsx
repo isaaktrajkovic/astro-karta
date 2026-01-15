@@ -25,6 +25,7 @@ import {
   getHoroscopeSubscriptions,
   HoroscopeDeliveryLog,
   HoroscopeSubscription,
+  updateHoroscopeSendHour,
 } from '@/lib/api';
 
 interface HoroscopeAdminDialogProps {
@@ -41,6 +42,8 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
   const [isCreatingTest, setIsCreatingTest] = useState(false);
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [sendHourEdits, setSendHourEdits] = useState<Record<string, string>>({});
+  const [savingSendHourId, setSavingSendHourId] = useState<string | null>(null);
   const [testForm, setTestForm] = useState({
     email: '',
     zodiacSign: 'aries',
@@ -78,7 +81,18 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
         getHoroscopeDeliveries(300),
       ]);
 
-      setSubscriptions(subscriptionsResponse.subscriptions || []);
+      const nextSubscriptions = subscriptionsResponse.subscriptions || [];
+      setSubscriptions(nextSubscriptions);
+      setSendHourEdits((prev) => {
+        const next = { ...prev };
+        for (const subscription of nextSubscriptions) {
+          const sendHour = Number.isInteger(subscription.send_hour)
+            ? subscription.send_hour
+            : 8;
+          next[subscription.id] = `${String(sendHour).padStart(2, '0')}:00`;
+        }
+        return next;
+      });
       setDeliveries(deliveriesResponse.deliveries || []);
     } catch (error) {
       console.error('Failed to fetch horoscope admin data:', error);
@@ -150,6 +164,70 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
     plan === 'premium'
       ? (language === 'sr' ? 'Premium' : 'Premium')
       : (language === 'sr' ? 'Osnovni' : 'Basic');
+
+  const getSendHourValue = (subscription: HoroscopeSubscription) => {
+    const fallback = Number.isInteger(subscription.send_hour)
+      ? subscription.send_hour
+      : 8;
+    return sendHourEdits[subscription.id] || `${String(fallback).padStart(2, '0')}:00`;
+  };
+
+  const parseSendHour = (value: string) => {
+    const match = String(value || '').trim().match(/^(\d{1,2}):/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+    return hour;
+  };
+
+  const handleSaveSendHour = async (subscription: HoroscopeSubscription) => {
+    const value = getSendHourValue(subscription);
+    const hour = parseSendHour(value);
+    if (hour === null) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Unesite vreme u formatu HH:00.'
+          : 'Enter time in HH:00 format.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSavingSendHourId(subscription.id);
+    try {
+      const response = await updateHoroscopeSendHour(subscription.id, hour);
+      const updated = response.subscription;
+      setSubscriptions((prev) =>
+        prev.map((item) =>
+          item.id === subscription.id
+            ? { ...item, send_hour: updated.send_hour, next_send_at: updated.next_send_at }
+            : item
+        )
+      );
+      setSendHourEdits((prev) => ({
+        ...prev,
+        [subscription.id]: `${String(updated.send_hour).padStart(2, '0')}:00`,
+      }));
+      toast({
+        title: language === 'sr' ? 'Uspešno' : 'Success',
+        description: language === 'sr'
+          ? 'Vreme slanja je ažurirano.'
+          : 'Send time updated.',
+      });
+    } catch (error) {
+      console.error('Failed to update send hour:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće ažurirati vreme slanja.'
+          : 'Could not update send time.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSendHourId(null);
+    }
+  };
 
   const filteredSubscriptions = useMemo(() => {
     if (subscriptionStatusFilter === 'all') return subscriptions;
@@ -479,6 +557,8 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                       <th className="p-3 text-left">{language === 'sr' ? 'Znak' : 'Sign'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Plan' : 'Plan'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Status' : 'Status'}</th>
+                      <th className="p-3 text-left">{language === 'sr' ? 'Zona' : 'Time zone'}</th>
+                      <th className="p-3 text-left">{language === 'sr' ? 'Vreme slanja' : 'Send time'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Sledeće slanje' : 'Next send'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Poslednje slanje' : 'Last sent'}</th>
                       <th className="p-3 text-left">{language === 'sr' ? 'Poslato' : 'Sent'}</th>
@@ -500,6 +580,36 @@ const HoroscopeAdminDialog = ({ open, onOpenChange }: HoroscopeAdminDialogProps)
                           <span className={`inline-flex rounded-full px-2 py-1 text-xs ${getStatusStyle(subscription.status)}`}>
                             {subscription.status}
                           </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground">
+                          {subscription.timezone || '-'}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="time"
+                              step={3600}
+                              value={getSendHourValue(subscription)}
+                              onChange={(event) =>
+                                setSendHourEdits((prev) => ({
+                                  ...prev,
+                                  [subscription.id]: event.target.value,
+                                }))
+                              }
+                              disabled={subscription.status !== 'active'}
+                              className="h-8 w-[110px] bg-background"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSaveSendHour(subscription)}
+                              disabled={subscription.status !== 'active' || savingSendHourId === subscription.id}
+                            >
+                              {savingSendHourId === subscription.id
+                                ? (language === 'sr' ? '...' : '...')
+                                : (language === 'sr' ? 'Sačuvaj' : 'Save')}
+                            </Button>
+                          </div>
                         </td>
                         <td className="p-3 text-muted-foreground">{formatDateTime(subscription.next_send_at)}</td>
                         <td className="p-3 text-muted-foreground">{formatDateTime(subscription.last_sent_at)}</td>

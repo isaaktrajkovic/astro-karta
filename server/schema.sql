@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS horoscope_subscriptions (
   timezone TEXT NOT NULL DEFAULT 'Europe/Belgrade',
   plan TEXT NOT NULL DEFAULT 'basic',
   birth_time TIME NULL,
+  send_hour INT NOT NULL DEFAULT 8,
   gender TEXT NOT NULL DEFAULT 'unspecified',
   status TEXT NOT NULL DEFAULT 'active',
   start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

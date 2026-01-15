@@ -52,6 +52,7 @@ export interface HoroscopeSubscription {
   gender: string | null;
   plan: string;
   birth_time: string | null;
+  send_hour: number | null;
   status: string;
   start_at: string;
   end_at: string;
@@ -232,6 +233,16 @@ export const cancelHoroscopeSubscription = (subscriptionId: string) =>
     method: 'POST',
     auth: true,
   });
+
+export const updateHoroscopeSendHour = (subscriptionId: string, sendHour: number) =>
+  request<{ success: true; subscription: { id: string; send_hour: number; next_send_at: string | null } }>(
+    `/api/horoscope/subscriptions/${subscriptionId}/send-hour`,
+    {
+      method: 'PATCH',
+      auth: true,
+      body: JSON.stringify({ send_hour: sendHour }),
+    }
+  );
 
 export const getHoroscopeDeliveries = (limit = 200) =>
   request<{ deliveries: HoroscopeDeliveryLog[] }>(`/api/horoscope/deliveries?limit=${limit}`, {

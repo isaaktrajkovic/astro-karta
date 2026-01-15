@@ -40,6 +40,10 @@ const dailyContextUrlTemplates = (process.env.DAILY_CONTEXT_URLS || process.env.
 const dailyContextTimeoutMs = Number(process.env.DAILY_CONTEXT_TIMEOUT_MS || 3500);
 const dailyContextCacheTtlMs = Number(process.env.DAILY_CONTEXT_CACHE_TTL_MS || 6 * 60 * 60 * 1000);
 const dailyContextMaxLen = Number(process.env.DAILY_CONTEXT_MAX_LEN || 800);
+const dailyContextUserAgent =
+  process.env.DAILY_CONTEXT_USER_AGENT ||
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+const dailyContextAcceptLanguage = process.env.DAILY_CONTEXT_ACCEPT_LANGUAGE || 'en-US,en;q=0.9';
 const compatibilityCacheTtlMs = Number(process.env.COMPATIBILITY_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000);
 const compatibilityCacheMax = Number(process.env.COMPATIBILITY_CACHE_MAX || 500);
 const compatibilityCache = new Map();
@@ -661,6 +665,20 @@ const normalizeBirthTime = (birthTime) => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+const normalizeSendHour = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    if (Number.isInteger(value) && value >= 0 && value <= 23) return value;
+    return null;
+  }
+  const trimmed = String(value).trim();
+  const timeMatch = trimmed.match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!timeMatch) return null;
+  const hours = Number(timeMatch[1]);
+  if (!Number.isFinite(hours) || hours < 0 || hours > 23) return null;
+  return hours;
+};
+
 const normalizeGender = (gender) => {
   const normalized = String(gender || '').trim().toLowerCase();
   if (normalized === 'male' || normalized === 'female') {
@@ -978,7 +996,14 @@ const fetchDailyContextFromUrl = async (url) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), dailyContextTimeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': dailyContextUserAgent,
+        'Accept-Language': dailyContextAcceptLanguage,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
     const raw = await response.text();
     if (!raw) return '';
 
@@ -1361,6 +1386,7 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), opt
   const plan = subscription.plan === 'premium' ? 'premium' : 'basic';
   const birthTime = normalizeBirthTime(subscription.birth_time);
   const gender = normalizeGender(subscription.gender);
+  const sendHour = normalizeSendHour(subscription.send_hour) ?? horoscopeSendHour;
   const sendAt = overrideSendAt
     ? new Date(overrideSendAt)
     : subscription.next_send_at
@@ -1452,8 +1478,8 @@ const deliverSubscriptionHoroscope = async (subscription, cache = new Map(), opt
   const nextSendAt = completed
     ? null
     : forceNextDay
-      ? getNextSendAtAfterImmediate(sendAt, timezone, horoscopeSendHour)
-      : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, horoscopeSendHour);
+      ? getNextSendAtAfterImmediate(sendAt, timezone, sendHour)
+      : getNextSendAt(new Date(sendAt.getTime() + 1000), timezone, sendHour);
 
   await pool.query(
     `UPDATE horoscope_subscriptions
@@ -1479,6 +1505,7 @@ async function createHoroscopeSubscription({
   language,
   timezone,
   plan,
+  sendHour,
   sendNow = false,
 }) {
   if (!pool) return;
@@ -1490,6 +1517,7 @@ async function createHoroscopeSubscription({
   const normalizedBirthTime = normalizeBirthTime(birthTime);
   const normalizedGender = normalizeGender(gender);
   const normalizedPlan = plan === 'premium' ? 'premium' : 'basic';
+  const normalizedSendHour = normalizeSendHour(sendHour) ?? horoscopeSendHour;
 
   const now = new Date();
   const endAt = new Date(now);
@@ -1497,7 +1525,7 @@ async function createHoroscopeSubscription({
 
   const nextSendAt = sendNow
     ? now
-    : getNextSendAt(now, normalizedTimezone, horoscopeSendHour);
+    : getNextSendAt(now, normalizedTimezone, normalizedSendHour);
   const unsubscribeToken = crypto.randomBytes(24).toString('hex');
 
   const { rows } = await pool.query(
@@ -1512,13 +1540,14 @@ async function createHoroscopeSubscription({
       plan,
       birth_time,
       gender,
+      send_hour,
       status,
       start_at,
       end_at,
       next_send_at,
       unsubscribe_token
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)
-    RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, next_send_at, end_at, send_count, unsubscribe_token`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $13, $14, $15)
+    RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, send_hour, next_send_at, end_at, send_count, unsubscribe_token`,
     [
       orderId || null,
       email,
@@ -1530,6 +1559,7 @@ async function createHoroscopeSubscription({
       normalizedPlan,
       normalizedBirthTime,
       normalizedGender,
+      normalizedSendHour,
       now,
       endAt,
       nextSendAt,
@@ -1563,6 +1593,7 @@ const dispatchDailyHoroscopes = async () => {
         plan,
         birth_time,
         gender,
+        send_hour,
         next_send_at,
         end_at,
         send_count,
@@ -2096,6 +2127,7 @@ app.get('/api/horoscope/subscriptions', requireAuth, async (_req, res) => {
         gender,
         plan,
         birth_time,
+        send_hour,
         status,
         start_at,
         end_at,
@@ -2173,6 +2205,56 @@ app.get('/api/horoscope/deliveries', requireAuth, async (req, res) => {
   }
 });
 
+app.patch('/api/horoscope/subscriptions/:id/send-hour', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const subscriptionId = Number(req.params.id);
+  if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
+    return res.status(400).json({ error: 'Invalid subscription id' });
+  }
+
+  const { send_hour } = req.body || {};
+  const normalizedSendHour = normalizeSendHour(send_hour);
+  if (normalizedSendHour === null) {
+    return res.status(400).json({ error: 'Invalid send hour' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, timezone, status
+       FROM horoscope_subscriptions
+       WHERE id = $1
+       LIMIT 1`,
+      [subscriptionId]
+    );
+    const subscription = rows[0];
+    if (!subscription) {
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    const normalizedTimezone = normalizeTimezone(subscription.timezone);
+    const nextSendAt = subscription.status === 'active'
+      ? getNextSendAt(new Date(), normalizedTimezone, normalizedSendHour)
+      : null;
+
+    const { rows: updatedRows } = await pool.query(
+      `UPDATE horoscope_subscriptions
+       SET send_hour = $1,
+           next_send_at = CASE WHEN status = 'active' THEN $2 ELSE next_send_at END
+       WHERE id = $3
+       RETURNING id, send_hour, next_send_at`,
+      [normalizedSendHour, nextSendAt, subscriptionId]
+    );
+
+    return res.json({ success: true, subscription: updatedRows[0] });
+  } catch (error) {
+    console.error('Failed to update send hour:', error);
+    return res.status(500).json({ error: 'Failed to update send hour' });
+  }
+});
+
 app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: 'Database not configured' });
@@ -2216,6 +2298,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
   const normalizedTimezone = normalizeTimezone(timezone);
   const normalizedBirthTime = normalizeBirthTime(birth_time);
   const normalizedGender = normalizeGender(gender);
+  const normalizedSendHour = normalizeSendHour(req.body?.send_hour) ?? horoscopeSendHour;
 
   const now = new Date();
   const endAt = new Date(now);
@@ -2223,7 +2306,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
 
   const nextSendAt = send_now
     ? now
-    : getNextSendAt(now, normalizedTimezone, horoscopeSendHour);
+    : getNextSendAt(now, normalizedTimezone, normalizedSendHour);
   const unsubscribeToken = crypto.randomBytes(24).toString('hex');
 
   try {
@@ -2239,13 +2322,14 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
         plan,
         birth_time,
         gender,
+        send_hour,
         status,
         start_at,
         end_at,
         next_send_at,
         unsubscribe_token
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14)
-      RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, next_send_at, end_at, send_count, unsubscribe_token`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $13, $14, $15)
+      RETURNING id, email, first_name, last_name, zodiac_sign, language, timezone, plan, birth_time, gender, send_hour, next_send_at, end_at, send_count, unsubscribe_token`,
       [
         null,
         normalizedEmail,
@@ -2257,6 +2341,7 @@ app.post('/api/horoscope/test-subscription', requireAuth, async (req, res) => {
         normalizedPlan,
         normalizedBirthTime,
         normalizedGender,
+        normalizedSendHour,
         now,
         endAt,
         nextSendAt,
