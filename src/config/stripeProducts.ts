@@ -14,8 +14,6 @@ const stripeProducts: Record<string, StripeProductConfig> = {
   'consult-email': { priceId: 'price_consult_email_test', mode: 'payment' },
   'consult-vip': { priceId: 'price_consult_vip_test', mode: 'payment' },
   'consult-live': { priceId: 'price_consult_live_test', mode: 'payment' },
-  'physical-talisman': { priceId: 'price_physical_talisman_test', mode: 'payment' },
-  'physical-crystal': { priceId: 'price_physical_crystal_test', mode: 'payment' },
 };
 
 export const getStripeProduct = (productId: string): StripeProductConfig | undefined =>

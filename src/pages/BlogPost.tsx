@@ -15,8 +15,6 @@ const productData: Record<string, { titleSr: string; titleEn: string; priceCents
   'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 600 },
   'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', priceCents: 1200 },
   'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation', priceCents: 1500 },
-  'physical-talisman': { titleSr: 'Talisman set', titleEn: 'Talisman Set', priceCents: 3000 },
-  'physical-crystal': { titleSr: 'Premium kristal set', titleEn: 'Premium Crystal Set', priceCents: 4000 },
 };
 
 interface BlogPostData {
@@ -223,7 +221,6 @@ The Full Moon symbolizes culmination, fulfillment, and release. It is a time for
 Our Talisman set contains everything you need for powerful ritual practices.`,
     date: '2024-12-15',
     image: heroImage,
-    productId: 'physical-talisman',
   },
   {
     id: '4',

@@ -1,8 +1,6 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import ProductCard from '@/components/ProductCard';
 import CompatibilityCalculator from '@/components/CompatibilityCalculator';
-import talismanImage from '@/assets/talisman-set.jpg';
-import crystalImage from '@/assets/crystal-set.jpg';
 import reportImage from '@/assets/astro-report.jpg';
 import consultationImage from '@/assets/consultation.jpg';
 
@@ -88,24 +86,6 @@ const Products = () => {
     },
   ];
 
-  const physicalSets = [
-    {
-      id: 'physical-talisman',
-      title: t('physical.talisman.title'),
-      description: t('physical.talisman.desc'),
-      priceCents: 3000,
-      image: talismanImage,
-    },
-    {
-      id: 'physical-crystal',
-      title: t('physical.crystal.title'),
-      description: t('physical.crystal.desc'),
-      priceCents: 4000,
-      image: crystalImage,
-      badge: 'Premium',
-    },
-  ];
-
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4">
@@ -160,17 +140,6 @@ const Products = () => {
           </div>
         </section>
 
-        {/* Physical Sets */}
-        <section id="physical" className="scroll-mt-24">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-foreground">
-            {t('products.physical')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {physicalSets.map((product) => (
-              <ProductCard key={product.id} {...product} />
-            ))}
-          </div>
-        </section>
       </div>
     </div>
   );

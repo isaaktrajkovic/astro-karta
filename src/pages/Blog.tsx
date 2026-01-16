@@ -46,7 +46,6 @@ const blogPosts: BlogPost[] = [
     excerptEn: 'Full Moon is a time for release and manifestation. Discover powerful rituals for this special time...',
     date: '2024-12-15',
     image: heroImage,
-    productId: 'physical-talisman',
   },
   {
     id: '4',

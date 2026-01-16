@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, FileText, MessageCircle, Package, Calendar, Star, Heart } from 'lucide-react';
+import { ArrowRight, Sparkles, FileText, MessageCircle, Calendar, Star, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import heroImage from '@/assets/hero-zodiac.jpg';
-import talismanImage from '@/assets/talisman-set.jpg';
-import crystalImage from '@/assets/crystal-set.jpg';
 import reportImage from '@/assets/astro-report.jpg';
 import consultationImage from '@/assets/consultation.jpg';
 
@@ -35,14 +33,6 @@ const Index = () => {
       icon: MessageCircle,
       image: consultationImage,
       color: 'from-primary to-accent',
-    },
-    {
-      id: 'physical',
-      title: t('products.physical'),
-      description: t('products.physical.desc'),
-      icon: Package,
-      image: talismanImage,
-      color: 'from-accent to-primary',
     },
   ];
 
