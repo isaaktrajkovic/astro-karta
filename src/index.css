@@ -188,3 +188,30 @@
     text-wrap: balance;
   }
 }
+
+@layer base {
+  body.print-report {
+    background: #f8fafc;
+    color: #0f172a;
+  }
+
+  body.print-report nav,
+  body.print-report footer {
+    display: none;
+  }
+
+  body.print-report main {
+    padding-top: 0;
+  }
+
+  body.print-report * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @media print {
+    body.print-report {
+      background: #ffffff;
+    }
+  }
+}

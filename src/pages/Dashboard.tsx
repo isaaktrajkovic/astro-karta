@@ -7,7 +7,6 @@ import { toast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { jsPDF } from 'jspdf';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
 import {
@@ -491,171 +490,12 @@ const Dashboard = () => {
     });
   };
 
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-    return btoa(binary);
-  };
-
-  const hasValidFontSignature = (buffer: ArrayBuffer) => {
-    if (buffer.byteLength < 4) return false;
-    const bytes = new Uint8Array(buffer.slice(0, 4));
-    const signature = String.fromCharCode(...bytes);
-    const isTtf = bytes[0] === 0x00 && bytes[1] === 0x01 && bytes[2] === 0x00 && bytes[3] === 0x00;
-    return isTtf || signature === 'OTTO' || signature === 'ttcf' || signature === 'true';
-  };
-
-  const loadPdfFont = async (doc: jsPDF) => {
-    const fontName = 'NotoSans';
-    const fontStyle = 'normal';
-    const fontFile = 'NotoSans-Regular.ttf';
-    const hasFont = () => {
-      const list = doc.getFontList?.() || {};
-      const styles = list[fontName];
-      return Array.isArray(styles) ? styles.includes(fontStyle) : false;
-    };
-
-    if (hasFont()) {
-      doc.setFont(fontName, fontStyle);
-      return { name: fontName, style: fontStyle };
-    }
-
-    try {
-      const response = await fetch('/fonts/NotoSans-Regular.ttf');
-      if (!response.ok) {
-        throw new Error('Font download failed');
-      }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength < 1024 || !hasValidFontSignature(buffer)) {
-        throw new Error('Font file looks invalid');
-      }
-      const base64 = arrayBufferToBase64(buffer);
-      doc.addFileToVFS(fontFile, base64);
-      doc.addFont(fontFile, fontName, fontStyle);
-      if (!hasFont()) {
-        throw new Error('Font registration failed');
-      }
-      doc.setFont(fontName, fontStyle);
-      return { name: fontName, style: fontStyle };
-    } catch (error) {
-      console.error('Failed to load PDF font:', error);
-      doc.setFont('helvetica', 'normal');
-      return { name: 'helvetica', style: 'normal' };
-    }
-  };
-
-  const exportReferralPdf = async () => {
+  const openReferralPrint = () => {
     if (!selectedReferral) return;
-    if (!referralOrders.length) {
-      toast({
-        title: language === 'sr' ? 'Upozorenje' : 'Warning',
-        description: language === 'sr'
-          ? 'Nema porudžbina za izvoz.'
-          : 'No orders to export.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const report = getReferralReportData();
-    if (!report) return;
-
-    if (!report.summaryHeaders.length) {
-      toast({
-        title: language === 'sr' ? 'Greška' : 'Error',
-        description: language === 'sr'
-          ? 'Nema podataka za PDF.'
-          : 'No data for PDF.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-      const pdfFont = await loadPdfFont(doc);
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      const autoTableModule = await import('jspdf-autotable');
-      const autoTableFn =
-        typeof autoTableModule.default === 'function'
-          ? autoTableModule.default
-          : (autoTableModule as unknown as { autoTable?: (doc: jsPDF, options: unknown) => void })
-              .autoTable;
-      if (!autoTableFn) {
-        throw new Error('PDF table generator not available');
-      }
-
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, pageWidth, 84, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
-      doc.text('Astro whisper', 40, 40);
-      doc.setFontSize(11);
-      doc.text(report.referralLabel, 40, 62);
-
-      doc.setTextColor(17, 24, 39);
-      doc.setFontSize(13);
-      doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
-
-      const renderSummaryTable = (fontName: string, fontStyle: string) => {
-        doc.setFont(fontName, fontStyle);
-        autoTableFn(doc, {
-          startY: 120,
-          head: [report.summaryHeaders],
-          body: report.summaryRows.length ? report.summaryRows : [],
-          styles: {
-            font: fontName,
-            fontStyle,
-            fontSize: 9,
-            textColor: [15, 23, 42],
-            cellPadding: 6,
-          },
-          headStyles: {
-            fillColor: [30, 41, 59],
-            textColor: [255, 255, 255],
-          },
-          alternateRowStyles: {
-            fillColor: [241, 245, 249],
-          },
-          columnStyles: report.summaryHeaders.reduce<Record<number, { cellWidth?: number }>>((acc, _, index) => {
-            acc[index] = { cellWidth: index === 0 ? 180 : 90 };
-            return acc;
-          }, {}),
-          tableWidth: 'wrap',
-        });
-      };
-
-      try {
-        renderSummaryTable(pdfFont.name, pdfFont.style);
-      } catch (tableError) {
-        console.error('PDF table render failed, retrying with standard font:', tableError);
-        renderSummaryTable('helvetica', 'normal');
-      }
-
-      doc.save(`${report.filename}.pdf`);
-
-      toast({
-        title: language === 'sr' ? 'Uspešno' : 'Success',
-        description: language === 'sr'
-          ? 'PDF izveštaj je preuzet.'
-          : 'PDF report downloaded.',
-      });
-    } catch (error) {
-      console.error('Failed to export PDF:', error);
-      toast({
-        title: language === 'sr' ? 'Greška' : 'Error',
-        description: error instanceof Error
-          ? error.message
-          : (language === 'sr'
-            ? 'PDF izveštaj nije mogao da se preuzme.'
-            : 'Could not download PDF report.'),
-        variant: 'destructive',
-      });
+    const url = `/dashboard/referrals/${selectedReferral.id}/print`;
+    const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!printWindow) {
+      window.location.href = url;
     }
   };
 
@@ -1943,10 +1783,10 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exportReferralPdf}
+                onClick={openReferralPrint}
                 disabled={!referralOrders.length}
               >
-                {language === 'sr' ? 'Preuzmi PDF' : 'Download PDF'}
+                {language === 'sr' ? 'Štampa / PDF' : 'Print / PDF'}
               </Button>
             </div>
 

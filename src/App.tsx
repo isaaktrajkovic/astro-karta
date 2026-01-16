@@ -15,6 +15,7 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Order from "./pages/Order";
 import Dashboard from "./pages/Dashboard";
+import ReferralPrint from "./pages/ReferralPrint";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FAQ from "./pages/FAQ";
@@ -44,6 +45,11 @@ const App = () => (
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard/referrals/:referralId/print" element={
+                  <ProtectedRoute>
+                    <ReferralPrint />
                   </ProtectedRoute>
                 } />
                 <Route path="*" element={<NotFound />} />
