@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -92,6 +92,7 @@ const getZodiacSign = (birthDate: string): ZodiacSign => {
 const getZodiacInfo = (sign: ZodiacSign) => zodiacSigns.find(z => z.key === sign);
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { language } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [calculatorUsageCount, setCalculatorUsageCount] = useState(0);
@@ -493,10 +494,7 @@ const Dashboard = () => {
   const openReferralPrint = () => {
     if (!selectedReferral) return;
     const url = `/dashboard/referrals/${selectedReferral.id}/print`;
-    const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!printWindow) {
-      window.location.href = url;
-    }
+    navigate(url);
   };
 
   const handleSaveReferralPaid = async (order: ReferralOrder) => {
