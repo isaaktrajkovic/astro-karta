@@ -501,6 +501,14 @@ const Dashboard = () => {
     return btoa(binary);
   };
 
+  const hasValidFontSignature = (buffer: ArrayBuffer) => {
+    if (buffer.byteLength < 4) return false;
+    const bytes = new Uint8Array(buffer.slice(0, 4));
+    const signature = String.fromCharCode(...bytes);
+    const isTtf = bytes[0] === 0x00 && bytes[1] === 0x01 && bytes[2] === 0x00 && bytes[3] === 0x00;
+    return isTtf || signature === 'OTTO' || signature === 'ttcf' || signature === 'true';
+  };
+
   const loadPdfFont = async (doc: jsPDF) => {
     const fontName = 'NotoSans';
     const fontStyle = 'normal';
@@ -522,6 +530,9 @@ const Dashboard = () => {
         throw new Error('Font download failed');
       }
       const buffer = await response.arrayBuffer();
+      if (buffer.byteLength < 1024 || !hasValidFontSignature(buffer)) {
+        throw new Error('Font file looks invalid');
+      }
       const base64 = arrayBufferToBase64(buffer);
       doc.addFileToVFS(fontFile, base64);
       doc.addFont(fontFile, fontName, fontStyle);
@@ -591,31 +602,40 @@ const Dashboard = () => {
       doc.setFontSize(13);
       doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
 
-      doc.setFont(pdfFont.name, pdfFont.style);
-      autoTableFn(doc, {
-        startY: 120,
-        head: [report.summaryHeaders],
-        body: report.summaryRows.length ? report.summaryRows : [],
-        styles: {
-          font: pdfFont.name,
-          fontStyle: pdfFont.style,
-          fontSize: 9,
-          textColor: [15, 23, 42],
-          cellPadding: 6,
-        },
-        headStyles: {
-          fillColor: [30, 41, 59],
-          textColor: [255, 255, 255],
-        },
-        alternateRowStyles: {
-          fillColor: [241, 245, 249],
-        },
-        columnStyles: report.summaryHeaders.reduce<Record<number, { cellWidth?: number }>>((acc, _, index) => {
-          acc[index] = { cellWidth: index === 0 ? 180 : 90 };
-          return acc;
-        }, {}),
-        tableWidth: 'wrap',
-      });
+      const renderSummaryTable = (fontName: string, fontStyle: string) => {
+        doc.setFont(fontName, fontStyle);
+        autoTableFn(doc, {
+          startY: 120,
+          head: [report.summaryHeaders],
+          body: report.summaryRows.length ? report.summaryRows : [],
+          styles: {
+            font: fontName,
+            fontStyle,
+            fontSize: 9,
+            textColor: [15, 23, 42],
+            cellPadding: 6,
+          },
+          headStyles: {
+            fillColor: [30, 41, 59],
+            textColor: [255, 255, 255],
+          },
+          alternateRowStyles: {
+            fillColor: [241, 245, 249],
+          },
+          columnStyles: report.summaryHeaders.reduce<Record<number, { cellWidth?: number }>>((acc, _, index) => {
+            acc[index] = { cellWidth: index === 0 ? 180 : 90 };
+            return acc;
+          }, {}),
+          tableWidth: 'wrap',
+        });
+      };
+
+      try {
+        renderSummaryTable(pdfFont.name, pdfFont.style);
+      } catch (tableError) {
+        console.error('PDF table render failed, retrying with standard font:', tableError);
+        renderSummaryTable('helvetica', 'normal');
+      }
 
       doc.save(`${report.filename}.pdf`);
 
