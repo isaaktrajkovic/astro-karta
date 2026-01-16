@@ -503,11 +503,17 @@ const Dashboard = () => {
 
   const loadPdfFont = async (doc: jsPDF) => {
     const fontName = 'NotoSans';
+    const fontStyle = 'normal';
     const fontFile = 'NotoSans-Regular.ttf';
-    const cached = doc.getFontList?.()?.[fontName];
-    if (cached) {
-      doc.setFont(fontName);
-      return fontName;
+    const hasFont = () => {
+      const list = doc.getFontList?.() || {};
+      const styles = list[fontName];
+      return Array.isArray(styles) ? styles.includes(fontStyle) : false;
+    };
+
+    if (hasFont()) {
+      doc.setFont(fontName, fontStyle);
+      return { name: fontName, style: fontStyle };
     }
 
     try {
@@ -518,13 +524,16 @@ const Dashboard = () => {
       const buffer = await response.arrayBuffer();
       const base64 = arrayBufferToBase64(buffer);
       doc.addFileToVFS(fontFile, base64);
-      doc.addFont(fontFile, fontName, 'normal');
-      doc.setFont(fontName);
-      return fontName;
+      doc.addFont(fontFile, fontName, fontStyle);
+      if (!hasFont()) {
+        throw new Error('Font registration failed');
+      }
+      doc.setFont(fontName, fontStyle);
+      return { name: fontName, style: fontStyle };
     } catch (error) {
       console.error('Failed to load PDF font:', error);
-      doc.setFont('helvetica');
-      return 'helvetica';
+      doc.setFont('helvetica', 'normal');
+      return { name: 'helvetica', style: 'normal' };
     }
   };
 
@@ -543,6 +552,17 @@ const Dashboard = () => {
 
     const report = getReferralReportData();
     if (!report) return;
+
+    if (!report.summaryHeaders.length) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nema podataka za PDF.'
+          : 'No data for PDF.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -571,12 +591,14 @@ const Dashboard = () => {
       doc.setFontSize(13);
       doc.text(language === 'sr' ? 'Sažetak po uslugama' : 'Service summary', 40, 110);
 
+      doc.setFont(pdfFont.name, pdfFont.style);
       autoTableFn(doc, {
         startY: 120,
         head: [report.summaryHeaders],
-        body: report.summaryRows,
+        body: report.summaryRows.length ? report.summaryRows : [],
         styles: {
-          font: pdfFont,
+          font: pdfFont.name,
+          fontStyle: pdfFont.style,
           fontSize: 9,
           textColor: [15, 23, 42],
           cellPadding: 6,
@@ -588,6 +610,11 @@ const Dashboard = () => {
         alternateRowStyles: {
           fillColor: [241, 245, 249],
         },
+        columnStyles: report.summaryHeaders.reduce<Record<number, { cellWidth?: number }>>((acc, _, index) => {
+          acc[index] = { cellWidth: index === 0 ? 180 : 90 };
+          return acc;
+        }, {}),
+        tableWidth: 'wrap',
       });
 
       doc.save(`${report.filename}.pdf`);
