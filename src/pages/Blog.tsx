@@ -34,7 +34,7 @@ const blogPosts: BlogPost[] = [
     excerptEn: 'The Moon travels through all zodiac signs within a month. Learn how this affects you...',
     date: '2024-12-18',
     image: heroImage,
-    productId: 'monthly-premium',
+    productId: 'monthly-basic',
   },
   {
     id: '3',

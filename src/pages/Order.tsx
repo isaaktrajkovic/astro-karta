@@ -6,8 +6,7 @@ import OrderForm from '@/components/OrderForm';
 import { formatPrice } from '@/lib/utils';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
-  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 500 },
-  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package', priceCents: 1000 },
+  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 0 },
   'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
   'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
   'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },

@@ -17,14 +17,34 @@ interface ProductCardProps {
 const ProductCard = ({ id, title, description, priceCents, image, badge, isConsultation = false }: ProductCardProps) => {
   const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleOrder = async () => {
+  const handleOrder = (event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation();
     setIsDialogOpen(true);
+  };
+
+  const handleToggleExpand = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleToggleExpand();
+    }
   };
 
   return (
     <>
-      <div className="group relative bg-card rounded-xl overflow-hidden border border-border hover-glow">
+      <div
+        className={`group relative bg-card rounded-xl overflow-hidden border border-border hover-glow transition-all cursor-pointer ${isExpanded ? 'shadow-lg' : ''}`}
+        onClick={handleToggleExpand}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+      >
         {badge && (
           <div className="absolute top-4 right-4 z-10 bg-accent text-accent-foreground px-3 py-1 rounded-full text-xs font-medium">
             {badge}
@@ -45,7 +65,7 @@ const ProductCard = ({ id, title, description, priceCents, image, badge, isConsu
             <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
               {title}
             </h3>
-            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+            <p className={`text-sm text-muted-foreground mt-2 transition-all ${isExpanded ? 'line-clamp-none' : 'line-clamp-2'}`}>
               {description}
             </p>
           </div>

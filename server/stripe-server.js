@@ -601,12 +601,10 @@ const sendManualReportEmail = async ({
 
 const horoscopeSubscriptionPlans = new Map([
   ['monthly-basic', 'basic'],
-  ['monthly-premium', 'premium'],
 ]);
 
 const productPriceCentsById = new Map([
-  ['monthly-basic', 500],
-  ['monthly-premium', 1000],
+  ['monthly-basic', 0],
   ['report-natal', 11000],
   ['report-yearly', 7000],
   ['report-solar', 9000],

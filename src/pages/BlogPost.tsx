@@ -7,8 +7,7 @@ import OrderDialog from '@/components/OrderDialog';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
-  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 500 },
-  'monthly-premium': { titleSr: 'Premium paket', titleEn: 'Premium Package', priceCents: 1000 },
+  'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 0 },
   'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
   'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
   'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },
@@ -147,7 +146,7 @@ Tracking Moon transits can help you better plan activities and understand why yo
 Our monthly packages include detailed information about all the important transits that await you.`,
     date: '2024-12-18',
     image: heroImage,
-    productId: 'monthly-premium',
+    productId: 'monthly-basic',
   },
   {
     id: '3',

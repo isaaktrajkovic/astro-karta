@@ -8,7 +8,6 @@ interface StripeProductConfig {
 const stripeProducts: Record<string, StripeProductConfig> = {
   // TODO: replace with real Stripe price IDs
   'monthly-basic': { priceId: '5', mode: 'subscription' },
-  'monthly-premium': { priceId: 'price_monthly_premium_test', mode: 'subscription' },
   'report-yearly': { priceId: 'price_report_yearly_test', mode: 'payment' },
   'report-love': { priceId: 'price_report_love_test', mode: 'payment' },
   'report-career': { priceId: 'price_report_career_test', mode: 'payment' },
