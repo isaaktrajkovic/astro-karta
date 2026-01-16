@@ -2359,6 +2359,8 @@ app.get('/api/referrals/:id/orders', requireAuth, async (req, res) => {
         id,
         customer_name,
         product_name,
+        discount_percent,
+        referral_commission_percent,
         final_price_cents,
         referral_commission_cents,
         referral_paid_cents,

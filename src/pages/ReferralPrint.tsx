@@ -53,6 +53,15 @@ const ReferralPrint = () => {
     fetchData();
   }, [fetchData]);
 
+  const formatPercentBreakdown = (valueMap: Map<number, number>) => {
+    if (!valueMap.size) return '0%';
+    const entries = Array.from(valueMap.entries()).sort((a, b) => a[0] - b[0]);
+    if (entries.length === 1) {
+      return `${entries[0][0]}%`;
+    }
+    return entries.map(([value, count]) => `${value}% (${count})`).join(', ');
+  };
+
   const summaryRows = useMemo(() => {
     const summaryMap = new Map<string, {
       product_name: string;
@@ -60,6 +69,8 @@ const ReferralPrint = () => {
       total_revenue_cents: number;
       total_commission_cents: number;
       paid_cents: number;
+      discount_percent_map: Map<number, number>;
+      commission_percent_map: Map<number, number>;
     }>();
 
     orders.forEach((order) => {
@@ -69,11 +80,25 @@ const ReferralPrint = () => {
         total_revenue_cents: 0,
         total_commission_cents: 0,
         paid_cents: 0,
+        discount_percent_map: new Map<number, number>(),
+        commission_percent_map: new Map<number, number>(),
       };
       existing.order_count += 1;
       existing.total_revenue_cents += order.final_price_cents || 0;
       existing.total_commission_cents += order.referral_commission_cents || 0;
       existing.paid_cents += order.referral_paid_cents || 0;
+      const discountPercent = Number.isFinite(order.discount_percent) ? order.discount_percent : 0;
+      const commissionPercent = Number.isFinite(order.referral_commission_percent)
+        ? order.referral_commission_percent
+        : 0;
+      existing.discount_percent_map.set(
+        discountPercent,
+        (existing.discount_percent_map.get(discountPercent) || 0) + 1
+      );
+      existing.commission_percent_map.set(
+        commissionPercent,
+        (existing.commission_percent_map.get(commissionPercent) || 0) + 1
+      );
       summaryMap.set(order.product_name, existing);
     });
 
@@ -162,10 +187,10 @@ const ReferralPrint = () => {
                 {referral && (
                   <>
                     <span>
-                      {language === 'sr' ? 'Popust:' : 'Discount:'} {referral.discount_percent}%
+                      {language === 'sr' ? 'Trenutni popust:' : 'Current discount:'} {referral.discount_percent}%
                     </span>
                     <span>
-                      {language === 'sr' ? 'Provizija:' : 'Commission:'} {referral.commission_percent}%
+                      {language === 'sr' ? 'Trenutna provizija:' : 'Current commission:'} {referral.commission_percent}%
                     </span>
                   </>
                 )}
@@ -203,7 +228,13 @@ const ReferralPrint = () => {
                           {language === 'sr' ? 'Ukupni promet' : 'Total revenue'}
                         </th>
                         <th className="px-4 py-3 text-right font-semibold">
+                          {language === 'sr' ? 'Popust (%)' : 'Discount (%)'}
+                        </th>
+                        <th className="px-4 py-3 text-right font-semibold">
                           {language === 'sr' ? 'Ukupna provizija' : 'Total commission'}
+                        </th>
+                        <th className="px-4 py-3 text-right font-semibold">
+                          {language === 'sr' ? 'Provizija (%)' : 'Commission (%)'}
                         </th>
                         <th className="px-4 py-3 text-right font-semibold">
                           {language === 'sr' ? 'Isplaćeno' : 'Paid'}
@@ -224,7 +255,13 @@ const ReferralPrint = () => {
                               {formatPrice(row.total_revenue_cents)}
                             </td>
                             <td className="px-4 py-3 text-right text-slate-700">
+                              {formatPercentBreakdown(row.discount_percent_map)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-700">
                               {formatPrice(row.total_commission_cents)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-700">
+                              {formatPercentBreakdown(row.commission_percent_map)}
                             </td>
                             <td className="px-4 py-3 text-right text-slate-700">
                               {formatPrice(row.paid_cents)}
@@ -245,9 +282,11 @@ const ReferralPrint = () => {
                         <td className="px-4 py-3 text-right font-semibold">
                           {formatPrice(totals.total_revenue_cents)}
                         </td>
+                        <td className="px-4 py-3 text-right font-semibold">—</td>
                         <td className="px-4 py-3 text-right font-semibold">
                           {formatPrice(totals.total_commission_cents)}
                         </td>
+                        <td className="px-4 py-3 text-right font-semibold">—</td>
                         <td className="px-4 py-3 text-right font-semibold">{formatPrice(totals.paid_cents)}</td>
                         <td className="px-4 py-3 text-right font-semibold">{formatPrice(totalRemainingCents)}</td>
                       </tr>

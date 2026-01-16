@@ -345,12 +345,23 @@ const Dashboard = () => {
       return null;
     }
 
+    const formatPercentBreakdown = (valueMap: Map<number, number>) => {
+      if (!valueMap.size) return '0%';
+      const entries = Array.from(valueMap.entries()).sort((a, b) => a[0] - b[0]);
+      if (entries.length === 1) {
+        return `${entries[0][0]}%`;
+      }
+      return entries.map(([value, count]) => `${value}% (${count})`).join(', ');
+    };
+
     const summaryMap = new Map<string, {
       product_name: string;
       order_count: number;
       total_revenue_cents: number;
       total_commission_cents: number;
       paid_cents: number;
+      discount_percent_map: Map<number, number>;
+      commission_percent_map: Map<number, number>;
     }>();
 
     referralOrders.forEach((order) => {
@@ -360,11 +371,25 @@ const Dashboard = () => {
         total_revenue_cents: 0,
         total_commission_cents: 0,
         paid_cents: 0,
+        discount_percent_map: new Map<number, number>(),
+        commission_percent_map: new Map<number, number>(),
       };
       existing.order_count += 1;
       existing.total_revenue_cents += order.final_price_cents || 0;
       existing.total_commission_cents += order.referral_commission_cents || 0;
       existing.paid_cents += order.referral_paid_cents || 0;
+      const discountPercent = Number.isFinite(order.discount_percent) ? order.discount_percent : 0;
+      const commissionPercent = Number.isFinite(order.referral_commission_percent)
+        ? order.referral_commission_percent
+        : 0;
+      existing.discount_percent_map.set(
+        discountPercent,
+        (existing.discount_percent_map.get(discountPercent) || 0) + 1
+      );
+      existing.commission_percent_map.set(
+        commissionPercent,
+        (existing.commission_percent_map.get(commissionPercent) || 0) + 1
+      );
       summaryMap.set(order.product_name, existing);
     });
 
@@ -372,7 +397,9 @@ const Dashboard = () => {
       language === 'sr' ? 'Usluga' : 'Service',
       language === 'sr' ? 'Broj porudžbina' : 'Orders',
       language === 'sr' ? 'Ukupni promet (EUR)' : 'Total revenue (EUR)',
+      language === 'sr' ? 'Popust (%)' : 'Discount (%)',
       language === 'sr' ? 'Ukupna provizija (EUR)' : 'Total commission (EUR)',
+      language === 'sr' ? 'Provizija (%)' : 'Commission (%)',
       language === 'sr' ? 'Isplaćeno (EUR)' : 'Paid (EUR)',
       language === 'sr' ? 'Preostalo (EUR)' : 'Remaining (EUR)',
     ];
@@ -381,7 +408,9 @@ const Dashboard = () => {
       row.product_name,
       row.order_count,
       row.total_revenue_cents / 100,
+      formatPercentBreakdown(row.discount_percent_map),
       row.total_commission_cents / 100,
+      formatPercentBreakdown(row.commission_percent_map),
       row.paid_cents / 100,
       Math.max(row.total_commission_cents - row.paid_cents, 0) / 100,
     ]));

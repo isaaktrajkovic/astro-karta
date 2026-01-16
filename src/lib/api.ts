@@ -127,6 +127,8 @@ export interface ReferralOrder {
   id: number;
   customer_name: string;
   product_name: string;
+  discount_percent: number;
+  referral_commission_percent: number;
   final_price_cents: number;
   referral_commission_cents: number;
   referral_paid: boolean;
