@@ -21,6 +21,7 @@ import {
   updateReferral,
   getReferralOrders,
   updateOrderReferralPaid,
+  createBlogPost,
   Referral as ApiReferral,
   ReferralOrder as ApiReferralOrder,
 } from '@/lib/api';
@@ -128,6 +129,12 @@ const Dashboard = () => {
   });
   const [referralEditingId, setReferralEditingId] = useState<number | null>(null);
   const [referralSaving, setReferralSaving] = useState(false);
+  const [blogTitle, setBlogTitle] = useState('');
+  const [blogExcerpt, setBlogExcerpt] = useState('');
+  const [blogContent, setBlogContent] = useState('');
+  const [blogImages, setBlogImages] = useState<File[]>([]);
+  const [blogAttachments, setBlogAttachments] = useState<File[]>([]);
+  const [blogSaving, setBlogSaving] = useState(false);
   const referralFormRef = useRef<HTMLDivElement | null>(null);
   const referralCodeInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -287,6 +294,80 @@ const Dashboard = () => {
       });
     } finally {
       setReferralSaving(false);
+    }
+  };
+
+  const resetBlogForm = () => {
+    setBlogTitle('');
+    setBlogExcerpt('');
+    setBlogContent('');
+    setBlogImages([]);
+    setBlogAttachments([]);
+  };
+
+  const handleBlogImagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setBlogImages(files.slice(0, 2));
+  };
+
+  const handleBlogAttachmentsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setBlogAttachments(files.slice(0, 3));
+  };
+
+  const handleRemoveBlogImage = (index: number) => {
+    setBlogImages((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleRemoveBlogAttachment = (index: number) => {
+    setBlogAttachments((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleCreateBlogPost = async () => {
+    const title = blogTitle.trim();
+    const content = blogContent.trim();
+    const excerpt = blogExcerpt.trim();
+
+    if (!title || !content) {
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Naslov i tekst su obavezni.'
+          : 'Title and content are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBlogSaving(true);
+    try {
+      await createBlogPost({
+        title,
+        excerpt: excerpt || undefined,
+        content,
+        images: blogImages,
+        attachments: blogAttachments,
+      });
+      toast({
+        title: language === 'sr' ? 'Objavljeno' : 'Published',
+        description: language === 'sr'
+          ? 'Blog post je uspešno postavljen.'
+          : 'Blog post has been published.',
+      });
+      resetBlogForm();
+    } catch (error) {
+      console.error('Failed to create blog post:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr'
+            ? 'Blog post nije mogao da se objavi.'
+            : 'Could not publish blog post.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setBlogSaving(false);
     }
   };
 

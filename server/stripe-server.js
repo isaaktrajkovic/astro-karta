@@ -4,11 +4,17 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import OpenAI from 'openai';
 import crypto from 'crypto';
+import fs from 'fs';
 import pg from 'pg';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
 
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const port = process.env.PORT || 4242;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 const frontendUrlsEnv = process.env.FRONTEND_URLS || '';
@@ -20,6 +26,7 @@ const resendApiKey = process.env.RESEND_API_KEY || '';
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || '';
 const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL || adminEmail;
 const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${port}`;
+const normalizedApiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
 const databaseUrl = process.env.DATABASE_URL || '';
 const pgHost = process.env.PGHOST || '';
 const pgUser = process.env.PGUSER || '';
@@ -48,6 +55,10 @@ const compatibilityCacheTtlMs = Number(process.env.COMPATIBILITY_CACHE_TTL_MS ||
 const compatibilityCacheMax = Number(process.env.COMPATIBILITY_CACHE_MAX || 500);
 const compatibilityCache = new Map();
 const dailyContextCache = new Map();
+
+const uploadsDir = path.join(__dirname, 'uploads');
+const blogUploadsDir = path.join(uploadsDir, 'blog');
+fs.mkdirSync(blogUploadsDir, { recursive: true });
 
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 
@@ -631,6 +642,74 @@ const clampPercent = (value) => {
 };
 
 const normalizeReferralCode = (value) => String(value || '').trim().toUpperCase();
+const normalizeBlogSlug = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+    .trim();
+
+const createExcerpt = (content) => {
+  const cleaned = String(content || '').replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= 180) return cleaned;
+  return `${cleaned.slice(0, 177)}...`;
+};
+
+const parseJsonArray = (value) => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const blogUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, blogUploadsDir),
+    filename: (_req, file, cb) => {
+      const safeExt = path.extname(file.originalname || '').slice(0, 10);
+      cb(null, `${Date.now()}-${crypto.randomUUID()}${safeExt}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    if (file.fieldname === 'images' && file.mimetype.startsWith('image/')) {
+      return cb(null, true);
+    }
+    if (file.fieldname === 'attachments' && file.mimetype === 'application/pdf') {
+      return cb(null, true);
+    }
+    return cb(new Error('Unsupported file type'));
+  },
+  limits: {
+    files: 6,
+    fileSize: 15 * 1024 * 1024,
+  },
+}).fields([
+  { name: 'images', maxCount: 3 },
+  { name: 'attachments', maxCount: 3 },
+]);
+
+const buildBlogAsset = (file) => ({
+  url: `${normalizedApiBaseUrl}/uploads/blog/${file.filename}`,
+  name: file.originalname,
+  mime: file.mimetype,
+});
+
+const ensureUniqueBlogSlug = async (baseSlug) => {
+  const normalizedBase = baseSlug || 'blog-post';
+  let slug = normalizedBase;
+  let suffix = 1;
+  while (true) {
+    const { rowCount } = await pool.query('SELECT 1 FROM blog_posts WHERE slug = $1 LIMIT 1', [slug]);
+    if (!rowCount) return slug;
+    suffix += 1;
+    slug = `${normalizedBase}-${suffix}`;
+  }
+};
 
 const getSupportedLanguage = (language) =>
   Object.prototype.hasOwnProperty.call(languageLabelByCode, language) ? language : 'sr';
@@ -1677,6 +1756,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+app.use('/uploads', express.static(uploadsDir));
 app.use(express.json());
 
 // Simple rate limit for LLM endpoint (per IP)
@@ -2375,6 +2455,136 @@ app.get('/api/referrals/:id/orders', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Failed to fetch referral orders:', error);
     return res.status(500).json({ error: 'Failed to fetch referral orders' });
+  }
+});
+
+const handleBlogUpload = (req, res, next) => {
+  blogUpload(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message || 'Invalid upload' });
+    }
+    return next();
+  });
+};
+
+const formatBlogRow = (row) => ({
+  ...row,
+  images: parseJsonArray(row.image_urls),
+  attachments: parseJsonArray(row.attachment_urls),
+});
+
+app.get('/api/blog', async (_req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        id,
+        title,
+        slug,
+        excerpt,
+        image_urls,
+        attachment_urls,
+        is_published,
+        published_at,
+        created_at
+      FROM blog_posts
+      WHERE is_published = true
+      ORDER BY published_at DESC`
+    );
+    return res.json({ posts: rows.map(formatBlogRow) });
+  } catch (error) {
+    console.error('Failed to fetch blog posts:', error);
+    return res.status(500).json({ error: 'Failed to fetch blog posts' });
+  }
+});
+
+app.get('/api/blog/:slug', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const slug = String(req.params.slug || '').trim();
+  if (!slug) {
+    return res.status(400).json({ error: 'Invalid blog slug' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        id,
+        title,
+        slug,
+        excerpt,
+        content,
+        image_urls,
+        attachment_urls,
+        is_published,
+        published_at,
+        created_at
+      FROM blog_posts
+      WHERE slug = $1 AND is_published = true
+      LIMIT 1`,
+      [slug]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+    return res.json({ post: formatBlogRow(rows[0]) });
+  } catch (error) {
+    console.error('Failed to fetch blog post:', error);
+    return res.status(500).json({ error: 'Failed to fetch blog post' });
+  }
+});
+
+app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const title = String(req.body?.title || '').trim();
+  const content = String(req.body?.content || '').trim();
+  const excerptInput = String(req.body?.excerpt || '').trim();
+
+  if (!title || !content) {
+    return res.status(400).json({ error: 'Missing title or content' });
+  }
+
+  try {
+    const slugBase = normalizeBlogSlug(title) || 'blog-post';
+    const slug = await ensureUniqueBlogSlug(slugBase);
+    const images = (req.files?.images || []).map(buildBlogAsset);
+    const attachments = (req.files?.attachments || []).map(buildBlogAsset);
+    const excerpt = excerptInput || createExcerpt(content);
+
+    const { rows } = await pool.query(
+      `INSERT INTO blog_posts (
+        title,
+        slug,
+        excerpt,
+        content,
+        image_urls,
+        attachment_urls,
+        is_published,
+        published_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
+      RETURNING id, title, slug, excerpt, content, image_urls, attachment_urls, is_published, published_at, created_at`,
+      [
+        title,
+        slug,
+        excerpt,
+        content,
+        JSON.stringify(images),
+        JSON.stringify(attachments),
+      ]
+    );
+
+    return res.status(201).json({ success: true, post: formatBlogRow(rows[0]) });
+  } catch (error) {
+    console.error('Failed to create blog post:', error);
+    return res.status(500).json({ error: 'Failed to create blog post' });
   }
 });
 

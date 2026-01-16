@@ -138,6 +138,24 @@ export interface ReferralOrder {
   created_at: string;
 }
 
+export interface BlogAsset {
+  url: string;
+  name: string;
+  mime?: string;
+}
+
+export interface BlogPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content?: string;
+  images: BlogAsset[];
+  attachments: BlogAsset[];
+  published_at: string;
+  created_at: string;
+}
+
 export interface ReferralUpsertPayload {
   code: string;
   owner_first_name: string;
@@ -334,6 +352,49 @@ export const updateOrderReferralPaid = (
       body: JSON.stringify(payload),
     }
   );
+
+export const getBlogPosts = () =>
+  request<{ posts: BlogPost[] }>('/api/blog', {
+    method: 'GET',
+  });
+
+export const getBlogPost = (slug: string) =>
+  request<{ post: BlogPost }>(`/api/blog/${slug}`, {
+    method: 'GET',
+  });
+
+export const createBlogPost = async (payload: {
+  title: string;
+  excerpt?: string;
+  content: string;
+  images?: File[];
+  attachments?: File[];
+}) => {
+  const formData = new FormData();
+  formData.append('title', payload.title);
+  if (payload.excerpt) {
+    formData.append('excerpt', payload.excerpt);
+  }
+  formData.append('content', payload.content);
+  payload.images?.forEach((file) => formData.append('images', file));
+  payload.attachments?.forEach((file) => formData.append('attachments', file));
+
+  const token = getAuthToken();
+  const res = await fetch(`${apiBase}/api/blog`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+
+  const data = await parseResponseBody(res);
+  if (!res.ok) {
+    const message = data && typeof data === 'object' && 'error' in data
+      ? String((data as { error: string }).error)
+      : res.statusText;
+    throw new Error(message || 'Request failed');
+  }
+  return data as { success: true; post: BlogPost };
+};
 
 export const trackUsage = (payload: Pick<CalculatorUsage, 'sign1' | 'sign2' | 'compatibility'>) =>
   request<{ success: true }>('/api/usage', {

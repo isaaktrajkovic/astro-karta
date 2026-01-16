@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS orders (
   CONSTRAINT orders_gender_check CHECK (gender IN ('male', 'female', 'unspecified'))
 );
 
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  excerpt TEXT NOT NULL,
+  content TEXT NOT NULL,
+  image_urls TEXT NOT NULL DEFAULT '[]',
+  attachment_urls TEXT NOT NULL DEFAULT '[]',
+  is_published BOOLEAN NOT NULL DEFAULT TRUE,
+  published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
