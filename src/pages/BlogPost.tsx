@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderDialog from '@/components/OrderDialog';
+import { BlogAsset, BlogPost as ApiBlogPost, getBlogPost } from '@/lib/api';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
@@ -294,15 +295,118 @@ const BlogPost = () => {
   const { postId } = useParams<{ postId: string }>();
   const { language, t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dynamicPost, setDynamicPost] = useState<ApiBlogPost | null>(null);
+  const [dynamicLoading, setDynamicLoading] = useState(false);
+  const [dynamicError, setDynamicError] = useState<string | null>(null);
 
-  const post = blogPosts.find((p) => p.id === postId);
+  const staticPost = blogPosts.find((p) => p.id === postId);
+  const shouldLoadDynamic = Boolean(postId && !staticPost);
 
-  if (!post) {
+  useEffect(() => {
+    if (!shouldLoadDynamic || !postId) return;
+    let active = true;
+    setDynamicLoading(true);
+    setDynamicError(null);
+    getBlogPost(postId)
+      .then(({ post }) => {
+        if (!active) return;
+        setDynamicPost(post);
+      })
+      .catch((error) => {
+        console.error('Failed to load blog post:', error);
+        if (!active) return;
+        setDynamicError(language === 'sr'
+          ? 'Objava nije pronađena.'
+          : 'Post not found.');
+      })
+      .finally(() => {
+        if (active) setDynamicLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [language, postId, shouldLoadDynamic]);
+
+  const linkifyText = (text: string) => {
+    const regex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+    const parts: ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      const matchText = match[0];
+      const start = match.index;
+      if (start > lastIndex) {
+        parts.push(text.slice(lastIndex, start));
+      }
+      const href = matchText.startsWith('http') ? matchText : `https://${matchText}`;
+      parts.push(
+        <a
+          key={`${matchText}-${start}`}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline underline-offset-4"
+        >
+          {matchText}
+        </a>
+      );
+      lastIndex = start + matchText.length;
+    }
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    return parts;
+  };
+
+  const renderDynamicContent = (content: string, images: BlogAsset[]) => {
+    const paragraphs = content.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+    const imageGrid = images.length ? (
+      <div className="grid gap-4 md:grid-cols-2">
+        {images.map((image) => (
+          <img
+            key={image.url}
+            src={image.url}
+            alt={image.name || 'Blog image'}
+            className="w-full rounded-xl border border-border object-cover"
+          />
+        ))}
+      </div>
+    ) : null;
+
+    if (!paragraphs.length) {
+      return imageGrid;
+    }
+
+    return (
+      <div className="space-y-4">
+        {paragraphs.map((paragraph, index) => (
+          <div key={`${paragraph.slice(0, 12)}-${index}`} className="space-y-4">
+            <p className="text-muted-foreground leading-relaxed">
+              {linkifyText(paragraph)}
+            </p>
+            {index === 0 && imageGrid}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  if (dynamicLoading && !staticPost) {
+    return (
+      <div className="min-h-screen pt-24 pb-16">
+        <div className="container mx-auto px-4 text-center text-muted-foreground">
+          {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
+        </div>
+      </div>
+    );
+  }
+
+  if (!staticPost && !dynamicPost) {
     return (
       <div className="min-h-screen pt-24 pb-16">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">
-            {language === 'sr' ? 'Članak nije pronađen' : 'Article not found'}
+            {dynamicError || (language === 'sr' ? 'Članak nije pronađen' : 'Article not found')}
           </h1>
           <Button asChild variant="cosmic">
             <Link to="/blog">{t('blog.back')}</Link>
@@ -312,9 +416,14 @@ const BlogPost = () => {
     );
   }
 
-  const title = language === 'sr' ? post.titleSr : post.titleEn;
-  const content = language === 'sr' ? post.contentSr : post.contentEn;
-  const productInfo = post.productId ? productData[post.productId] : null;
+  const title = staticPost
+    ? (language === 'sr' ? staticPost.titleSr : staticPost.titleEn)
+    : (dynamicPost?.title || '');
+  const date = staticPost?.date || dynamicPost?.published_at || dynamicPost?.created_at || '';
+  const heroImageUrl = staticPost?.image || dynamicPost?.images?.[0]?.url || heroImage;
+  const staticContent = staticPost ? (language === 'sr' ? staticPost.contentSr : staticPost.contentEn) : '';
+  const attachments = dynamicPost?.attachments || [];
+  const productInfo = staticPost?.productId ? productData[staticPost.productId] : null;
   const productName = productInfo ? (language === 'sr' ? productInfo.titleSr : productInfo.titleEn) : '';
   const productPriceCents = productInfo?.priceCents || 0;
 
@@ -332,7 +441,7 @@ const BlogPost = () => {
           <article>
             <div className="aspect-video rounded-2xl overflow-hidden mb-8">
               <img
-                src={post.image}
+                src={heroImageUrl}
                 alt={title}
                 className="w-full h-full object-cover"
               />
@@ -340,15 +449,15 @@ const BlogPost = () => {
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Calendar className="w-4 h-4" />
-              <time dateTime={post.date}>
-                {new Date(post.date).toLocaleDateString(
+              <time dateTime={date}>
+                {date ? new Date(date).toLocaleDateString(
                   language === 'sr' ? 'sr-RS' : 'en-US',
                   {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
                   }
-                )}
+                ) : ''}
               </time>
             </div>
 
@@ -356,74 +465,101 @@ const BlogPost = () => {
               {title}
             </h1>
 
-            <div className="prose prose-invert prose-purple max-w-none">
-              {content.split('\n\n').map((paragraph, index) => {
-                if (paragraph.startsWith('## ')) {
+            {staticPost ? (
+              <div className="prose prose-invert prose-purple max-w-none">
+                {staticContent.split('\n\n').map((paragraph, index) => {
+                  if (paragraph.startsWith('## ')) {
+                    return (
+                      <h2 key={index} className="text-xl font-bold text-foreground mt-8 mb-4">
+                        {paragraph.replace('## ', '')}
+                      </h2>
+                    );
+                  }
+                  if (paragraph.startsWith('### ')) {
+                    return (
+                      <h3 key={index} className="text-lg font-semibold text-foreground mt-6 mb-3">
+                        {paragraph.replace('### ', '')}
+                      </h3>
+                    );
+                  }
+                  if (paragraph.startsWith('**') || paragraph.includes('\n**')) {
+                    return (
+                      <div key={index} className="text-muted-foreground mb-4">
+                        {paragraph.split('\n').map((line, lineIndex) => {
+                          const boldMatch = line.match(/^\*\*(.+?)\*\*\s*-?\s*(.*)$/);
+                          if (boldMatch) {
+                            return (
+                              <p key={lineIndex} className="mb-2">
+                                <strong className="text-foreground">{boldMatch[1]}</strong>
+                                {boldMatch[2] && ` - ${boldMatch[2]}`}
+                              </p>
+                            );
+                          }
+                          if (line.startsWith('- ')) {
+                            return (
+                              <li key={lineIndex} className="ml-4 list-disc">
+                                {line.replace('- ', '')}
+                              </li>
+                            );
+                          }
+                          return <p key={lineIndex}>{line}</p>;
+                        })}
+                      </div>
+                    );
+                  }
+                  if (paragraph.startsWith('- ') || paragraph.includes('\n- ')) {
+                    return (
+                      <ul key={index} className="list-disc list-inside text-muted-foreground mb-4 space-y-1">
+                        {paragraph.split('\n').map((line, lineIndex) => (
+                          <li key={lineIndex}>{line.replace('- ', '')}</li>
+                        ))}
+                      </ul>
+                    );
+                  }
+                  if (paragraph.match(/^\d+\./)) {
+                    return (
+                      <ol key={index} className="list-decimal list-inside text-muted-foreground mb-4 space-y-1">
+                        {paragraph.split('\n').map((line, lineIndex) => (
+                          <li key={lineIndex}>{line.replace(/^\d+\.\s*/, '')}</li>
+                        ))}
+                      </ol>
+                    );
+                  }
                   return (
-                    <h2 key={index} className="text-xl font-bold text-foreground mt-8 mb-4">
-                      {paragraph.replace('## ', '')}
-                    </h2>
+                    <p key={index} className="text-muted-foreground mb-4">
+                      {paragraph}
+                    </p>
                   );
-                }
-                if (paragraph.startsWith('### ')) {
-                  return (
-                    <h3 key={index} className="text-lg font-semibold text-foreground mt-6 mb-3">
-                      {paragraph.replace('### ', '')}
-                    </h3>
-                  );
-                }
-                if (paragraph.startsWith('**') || paragraph.includes('\n**')) {
-                  return (
-                    <div key={index} className="text-muted-foreground mb-4">
-                      {paragraph.split('\n').map((line, lineIndex) => {
-                        const boldMatch = line.match(/^\*\*(.+?)\*\*\s*-?\s*(.*)$/);
-                        if (boldMatch) {
-                          return (
-                            <p key={lineIndex} className="mb-2">
-                              <strong className="text-foreground">{boldMatch[1]}</strong>
-                              {boldMatch[2] && ` - ${boldMatch[2]}`}
-                            </p>
-                          );
-                        }
-                        if (line.startsWith('- ')) {
-                          return (
-                            <li key={lineIndex} className="ml-4 list-disc">
-                              {line.replace('- ', '')}
-                            </li>
-                          );
-                        }
-                        return <p key={lineIndex}>{line}</p>;
-                      })}
-                    </div>
-                  );
-                }
-                if (paragraph.startsWith('- ') || paragraph.includes('\n- ')) {
-                  return (
-                    <ul key={index} className="list-disc list-inside text-muted-foreground mb-4 space-y-1">
-                      {paragraph.split('\n').map((line, lineIndex) => (
-                        <li key={lineIndex}>{line.replace('- ', '')}</li>
-                      ))}
-                    </ul>
-                  );
-                }
-                if (paragraph.match(/^\d+\./)) {
-                  return (
-                    <ol key={index} className="list-decimal list-inside text-muted-foreground mb-4 space-y-1">
-                      {paragraph.split('\n').map((line, lineIndex) => (
-                        <li key={lineIndex}>{line.replace(/^\d+\.\s*/, '')}</li>
-                      ))}
-                    </ol>
-                  );
-                }
-                return (
-                  <p key={index} className="text-muted-foreground mb-4">
-                    {paragraph}
-                  </p>
-                );
-              })}
-            </div>
+                })}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {dynamicPost ? renderDynamicContent(dynamicPost.content || '', dynamicPost.images || []) : null}
+              </div>
+            )}
 
-            {post.productId && (
+            {!staticPost && attachments.length > 0 && (
+              <div className="mt-8 rounded-2xl border border-border bg-secondary/30 p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">
+                  {language === 'sr' ? 'Preuzmi priloge' : 'Download attachments'}
+                </h3>
+                <div className="space-y-2">
+                  {attachments.map((file) => (
+                    <a
+                      key={file.url}
+                      href={file.url}
+                      className="block text-sm text-primary underline underline-offset-4"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {file.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {staticPost?.productId && (
               <div className="mt-12 p-6 bg-secondary/30 rounded-2xl border border-border text-center">
                 <p className="text-foreground mb-4">
                   {language === 'sr'
@@ -437,11 +573,11 @@ const BlogPost = () => {
             )}
           </article>
 
-          {post.productId && (
+          {staticPost?.productId && (
             <OrderDialog
               open={isDialogOpen}
               onOpenChange={setIsDialogOpen}
-              productId={post.productId}
+              productId={staticPost.productId}
               productName={productName}
               priceCents={productPriceCents}
             />

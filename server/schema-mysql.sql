@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX blog_posts_published_at_idx ON blog_posts (published_at);
+
 CREATE TABLE IF NOT EXISTS admins (
   id INT AUTO_INCREMENT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,

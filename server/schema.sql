@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS blog_posts_published_at_idx
+  ON blog_posts (published_at DESC);
+
 CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,

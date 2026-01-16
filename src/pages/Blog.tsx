@@ -1,7 +1,9 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getBlogPosts, BlogPost as ApiBlogPost } from '@/lib/api';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 interface BlogPost {
@@ -60,6 +62,52 @@ const blogPosts: BlogPost[] = [
 
 const Blog = () => {
   const { language, t } = useLanguage();
+  const [dynamicPosts, setDynamicPosts] = useState<ApiBlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    getBlogPosts()
+      .then(({ posts }) => {
+        if (!active) return;
+        setDynamicPosts(posts || []);
+      })
+      .catch((error) => {
+        console.error('Failed to load blog posts:', error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const combinedPosts = useMemo(() => {
+    const normalizedDynamic = dynamicPosts.map((post) => ({
+      id: `dynamic-${post.id}`,
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt,
+      date: post.published_at || post.created_at,
+      image: post.images?.[0]?.url || heroImage,
+    }));
+
+    const normalizedStatic = blogPosts.map((post) => ({
+      id: post.id,
+      slug: post.id,
+      title: language === 'sr' ? post.titleSr : post.titleEn,
+      excerpt: language === 'sr' ? post.excerptSr : post.excerptEn,
+      date: post.date,
+      image: post.image,
+    }));
+
+    return [...normalizedDynamic, ...normalizedStatic].sort((a, b) => {
+      const aTime = new Date(a.date).getTime();
+      const bTime = new Date(b.date).getTime();
+      return bTime - aTime;
+    });
+  }, [dynamicPosts, language]);
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -77,7 +125,15 @@ const Blog = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {blogPosts.map((post) => (
+          {loading && combinedPosts.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground">
+              {language === 'sr' ? 'Učitavanje...' : 'Loading...'}
+            </div>
+          ) : combinedPosts.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground">
+              {language === 'sr' ? 'Nema objava.' : 'No posts yet.'}
+            </div>
+          ) : combinedPosts.map((post) => (
             <article
               key={post.id}
               className="group bg-card rounded-2xl overflow-hidden border border-border hover-glow cosmic-border"
@@ -85,7 +141,7 @@ const Blog = () => {
               <div className="aspect-video overflow-hidden">
                 <img
                   src={post.image}
-                  alt={language === 'sr' ? post.titleSr : post.titleEn}
+                  alt={post.title}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
               </div>
@@ -103,15 +159,15 @@ const Blog = () => {
                 </div>
                 
                 <h2 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-                  {language === 'sr' ? post.titleSr : post.titleEn}
+                  {post.title}
                 </h2>
                 
                 <p className="text-muted-foreground line-clamp-3">
-                  {language === 'sr' ? post.excerptSr : post.excerptEn}
+                  {post.excerpt}
                 </p>
                 
               <Button asChild variant="cosmic" size="sm">
-                <Link to={`/blog/${post.id}`}>
+                <Link to={`/blog/${post.slug}`}>
                   {t('blog.readMore')}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Link>

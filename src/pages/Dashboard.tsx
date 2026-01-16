@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -305,13 +305,31 @@ const Dashboard = () => {
     setBlogAttachments([]);
   };
 
-  const handleBlogImagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBlogImagesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+    if (files.length > 2) {
+      toast({
+        title: language === 'sr' ? 'Upozorenje' : 'Warning',
+        description: language === 'sr'
+          ? 'Maksimalno 2 slike po objavi.'
+          : 'Maximum 2 images per post.',
+        variant: 'destructive',
+      });
+    }
     setBlogImages(files.slice(0, 2));
   };
 
-  const handleBlogAttachmentsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBlogAttachmentsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+    if (files.length > 3) {
+      toast({
+        title: language === 'sr' ? 'Upozorenje' : 'Warning',
+        description: language === 'sr'
+          ? 'Maksimalno 3 PDF priloga po objavi.'
+          : 'Maximum 3 PDF attachments per post.',
+        variant: 'destructive',
+      });
+    }
     setBlogAttachments(files.slice(0, 3));
   };
 
@@ -1773,6 +1791,171 @@ const Dashboard = () => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Blog Section */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <StickyNote className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              {language === 'sr' ? 'Blog objave' : 'Blog posts'}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                {language === 'sr' ? 'Postavi novu objavu' : 'Publish a new post'}
+              </h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="blog-title">
+                    {language === 'sr' ? 'Naslov' : 'Title'}
+                  </Label>
+                  <Input
+                    id="blog-title"
+                    value={blogTitle}
+                    onChange={(event) => setBlogTitle(event.target.value)}
+                    placeholder={language === 'sr' ? 'Unesite naslov blog objave' : 'Enter blog post title'}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blog-excerpt">
+                    {language === 'sr' ? 'Kratak opis (opciono)' : 'Short excerpt (optional)'}
+                  </Label>
+                  <Textarea
+                    id="blog-excerpt"
+                    value={blogExcerpt}
+                    onChange={(event) => setBlogExcerpt(event.target.value)}
+                    placeholder={language === 'sr'
+                      ? 'Ako ostavite prazno, izvući ćemo kratak opis iz teksta.'
+                      : 'If left empty, a short excerpt will be generated from the text.'}
+                    rows={3}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blog-content">
+                    {language === 'sr' ? 'Tekst objave' : 'Post content'}
+                  </Label>
+                  <Textarea
+                    id="blog-content"
+                    value={blogContent}
+                    onChange={(event) => setBlogContent(event.target.value)}
+                    placeholder={language === 'sr'
+                      ? 'Unesite plain tekst. Linkovi (https://...) će biti klikabilni.'
+                      : 'Enter plain text. Links (https://...) will be clickable.'}
+                    rows={10}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blog-images">
+                    {language === 'sr' ? 'Slike (do 2)' : 'Images (up to 2)'}
+                  </Label>
+                  <Input
+                    id="blog-images"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleBlogImagesChange}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                  {blogImages.length > 0 && (
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      {blogImages.map((file, index) => (
+                        <div key={`${file.name}-${index}`} className="flex items-center justify-between">
+                          <span>{file.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveBlogImage(index)}
+                          >
+                            {language === 'sr' ? 'Ukloni' : 'Remove'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blog-attachments">
+                    {language === 'sr' ? 'PDF prilozi (do 3)' : 'PDF attachments (up to 3)'}
+                  </Label>
+                  <Input
+                    id="blog-attachments"
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    onChange={handleBlogAttachmentsChange}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                  {blogAttachments.length > 0 && (
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      {blogAttachments.map((file, index) => (
+                        <div key={`${file.name}-${index}`} className="flex items-center justify-between">
+                          <span>{file.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveBlogAttachment(index)}
+                          >
+                            {language === 'sr' ? 'Ukloni' : 'Remove'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="cosmic"
+                    onClick={handleCreateBlogPost}
+                    disabled={blogSaving}
+                  >
+                    {blogSaving
+                      ? (language === 'sr' ? 'Postavljanje...' : 'Publishing...')
+                      : (language === 'sr' ? 'Postavi' : 'Publish')}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={resetBlogForm} disabled={blogSaving}>
+                    {language === 'sr' ? 'Očisti formu' : 'Clear form'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
+                {language === 'sr' ? 'Saveti za objavu' : 'Publishing tips'}
+              </h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li>
+                  {language === 'sr'
+                    ? 'Linkovi sa https:// će automatski biti klikabilni.'
+                    : 'Links with https:// will automatically be clickable.'}
+                </li>
+                <li>
+                  {language === 'sr'
+                    ? 'Slike će se prikazati u tekstu odmah posle prvog pasusa.'
+                    : 'Images will appear in the text right after the first paragraph.'}
+                </li>
+                <li>
+                  {language === 'sr'
+                    ? 'PDF prilozi se prikazuju na kraju objave kao fajl za preuzimanje.'
+                    : 'PDF attachments are listed at the end of the post as downloads.'}
+                </li>
+              </ul>
             </div>
           </div>
         </div>
