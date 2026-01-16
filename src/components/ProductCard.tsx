@@ -9,15 +9,17 @@ interface ProductCardProps {
   title: string;
   description: string;
   priceCents: number;
+  originalPriceCents?: number;
   image: string;
   badge?: string;
   isConsultation?: boolean;
 }
 
-const ProductCard = ({ id, title, description, priceCents, image, badge, isConsultation = false }: ProductCardProps) => {
+const ProductCard = ({ id, title, description, priceCents, originalPriceCents, image, badge, isConsultation = false }: ProductCardProps) => {
   const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const showOriginalPrice = Number.isFinite(originalPriceCents) && (originalPriceCents ?? 0) > priceCents;
 
   const handleOrder = (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation();
@@ -71,7 +73,19 @@ const ProductCard = ({ id, title, description, priceCents, image, badge, isConsu
           </div>
           
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-bold text-primary">{formatPrice(priceCents)}</span>
+            <div className="flex flex-col">
+              {showOriginalPrice && (
+                <span className="text-sm text-muted-foreground line-through">
+                  {formatPrice(originalPriceCents || 0)}
+                </span>
+              )}
+              <span className="text-2xl font-bold text-primary">{formatPrice(priceCents)}</span>
+              {showOriginalPrice && (
+                <span className="text-xs text-emerald-400 uppercase tracking-wide">
+                  {t('products.sale')}
+                </span>
+              )}
+            </div>
             <Button 
               type="button"
               variant="cosmic" 

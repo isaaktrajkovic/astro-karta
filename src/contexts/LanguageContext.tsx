@@ -198,6 +198,14 @@ export const translations: Translations = {
     es: 'Pedir', 
     ru: 'Заказать' 
   },
+  'products.sale': {
+    sr: 'Akcija',
+    en: 'Sale',
+    fr: 'Promo',
+    de: 'Aktion',
+    es: 'Oferta',
+    ru: 'Акция'
+  },
   'products.monthly.desc': { 
     sr: 'Osnovni ili premium dnevni horoskop za Vaš znak', 
     en: 'Basic or premium daily horoscope for your sign', 

@@ -26,6 +26,7 @@ const Products = () => {
       title: t('reports.natal.title'),
       description: t('reports.natal.desc'),
       priceCents: 11000,
+      originalPriceCents: 15000,
       image: reportImage,
     },
     {
@@ -33,6 +34,7 @@ const Products = () => {
       title: t('reports.yearly.title'),
       description: t('reports.yearly.desc'),
       priceCents: 7000,
+      originalPriceCents: 9500,
       image: reportImage,
     },
     {
@@ -40,6 +42,7 @@ const Products = () => {
       title: t('reports.solar.title'),
       description: t('reports.solar.desc'),
       priceCents: 9000,
+      originalPriceCents: 12000,
       image: reportImage,
     },
     {
@@ -47,6 +50,7 @@ const Products = () => {
       title: t('reports.synastry.title'),
       description: t('reports.synastry.desc'),
       priceCents: 15000,
+      originalPriceCents: 22000,
       image: reportImage,
     },
     {
@@ -54,6 +58,7 @@ const Products = () => {
       title: t('reports.questions.title'),
       description: t('reports.questions.desc'),
       priceCents: 3500,
+      originalPriceCents: 5500,
       image: reportImage,
     },
   ];
