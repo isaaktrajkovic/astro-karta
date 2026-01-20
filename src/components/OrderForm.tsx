@@ -14,6 +14,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { createOrder, validateReferralCode } from '@/lib/api';
+import { startStripeCheckout } from '@/lib/stripeCheckout';
 import { formatPrice } from '@/lib/utils';
 
 interface OrderFormProps {
@@ -357,6 +358,11 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
 
     setIsSubmitting(true);
     try {
+      if (finalPriceCents > 0) {
+        await startStripeCheckout(built.payload);
+        return;
+      }
+
       await createOrder(built.payload);
 
       toast({

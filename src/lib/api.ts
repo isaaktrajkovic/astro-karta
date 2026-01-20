@@ -290,6 +290,12 @@ export const createOrder = (payload: CreateOrderPayload) =>
     body: JSON.stringify(payload),
   });
 
+export const createStripeCheckoutSession = (payload: CreateOrderPayload) =>
+  request<{ id: string }>('/api/stripe/create-checkout-session', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
 export const sendOrderReport = (
   orderId: number,
   payload: { subject?: string; message: string; language?: string }

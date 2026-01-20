@@ -14,6 +14,8 @@ import BlogPost from "./pages/BlogPost";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Order from "./pages/Order";
+import OrderSuccess from "./pages/OrderSuccess";
+import OrderCancel from "./pages/OrderCancel";
 import Dashboard from "./pages/Dashboard";
 import ReferralPrint from "./pages/ReferralPrint";
 import Auth from "./pages/Auth";
@@ -40,6 +42,8 @@ const App = () => (
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/order/:productId" element={<Order />} />
+                <Route path="/order-success" element={<OrderSuccess />} />
+                <Route path="/order-cancel" element={<OrderCancel />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/dashboard" element={

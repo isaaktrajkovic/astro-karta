@@ -9,6 +9,7 @@ import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import Stripe from 'stripe';
 
 dotenv.config();
 
@@ -28,6 +29,8 @@ const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL || adminEmai
 const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${port}`;
 const normalizedApiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
 const databaseUrl = process.env.DATABASE_URL || '';
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 const pgHost = process.env.PGHOST || '';
 const pgUser = process.env.PGUSER || '';
 const pgPassword = process.env.PGPASSWORD || '';
@@ -95,6 +98,10 @@ const openai =
   openaiApiKey.trim() !== ''
     ? new OpenAI({ apiKey: openaiApiKey })
     : null;
+const stripe =
+  stripeSecretKey.trim() !== ''
+    ? new Stripe(stripeSecretKey, { apiVersion: '2024-04-10' })
+    : null;
 
 const { Pool } = pg;
 const isRender = Boolean(process.env.RENDER) || Boolean(process.env.RENDER_SERVICE_ID);
@@ -136,6 +143,9 @@ if (!adminEmail || !adminPassword) {
 
 if (!resendApiKey || !resendFromEmail) {
   console.warn('⚠️ RESEND_API_KEY/RESEND_FROM_EMAIL not set. Email notifications will be skipped.');
+}
+if (!stripeSecretKey) {
+  console.warn('⚠️ STRIPE_SECRET_KEY not set. Stripe checkout will be disabled.');
 }
 
 const languageLabelByCode = {
@@ -639,6 +649,234 @@ const clampPercent = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
   return Math.min(Math.max(Math.round(numeric), 0), 100);
+};
+
+const buildOrderPayload = (body) => {
+  const {
+    product_id,
+    product_name,
+    customer_name,
+    first_name,
+    last_name,
+    birth_date,
+    birth_time,
+    birth_place,
+    city,
+    country,
+    email,
+    note,
+    consultation_description,
+    language,
+    timezone,
+    gender,
+    referral_code,
+  } = body || {};
+
+  const normalizedBirthTime = String(birth_time || '').trim();
+  const normalizedGender = normalizeGender(gender);
+  const normalizedLanguage = getSupportedLanguage(language);
+  const normalizedCustomerName = String(customer_name || `${first_name || ''} ${last_name || ''}`).trim();
+
+  if (
+    !product_id ||
+    !product_name ||
+    !normalizedCustomerName ||
+    !first_name ||
+    !last_name ||
+    !birth_date ||
+    !normalizedBirthTime ||
+    !birth_place ||
+    !city ||
+    !country ||
+    !email
+  ) {
+    return { error: 'Missing required fields' };
+  }
+
+  return {
+    data: {
+      product_id,
+      product_name,
+      customer_name: normalizedCustomerName,
+      first_name,
+      last_name,
+      birth_date,
+      birth_time: normalizedBirthTime,
+      birth_place,
+      city,
+      country,
+      email,
+      gender: normalizedGender,
+      note,
+      consultation_description,
+      language: normalizedLanguage,
+      timezone,
+      referral_code,
+    },
+  };
+};
+
+const getOrderPricing = async ({ product_id, referral_code }) => {
+  const basePriceCents = getProductPriceCents(product_id);
+  let referralId = null;
+  let referralCode = null;
+  let discountPercent = 0;
+  let discountAmountCents = 0;
+  let finalPriceCents = basePriceCents;
+  let commissionPercent = 0;
+  let commissionAmountCents = 0;
+  let referralPaidCents = 0;
+
+  const normalizedReferralCode = normalizeReferralCode(referral_code);
+  if (normalizedReferralCode) {
+    const { rows: referralRows } = await pool.query(
+      `SELECT id, code, discount_percent, commission_percent, is_active
+       FROM referrals
+       WHERE code = $1
+       LIMIT 1`,
+      [normalizedReferralCode]
+    );
+    const referral = referralRows[0];
+    if (!referral || !referral.is_active) {
+      return { error: 'Invalid referral code' };
+    }
+    referralId = referral.id;
+    referralCode = referral.code;
+    discountPercent = clampPercent(referral.discount_percent);
+    commissionPercent = clampPercent(referral.commission_percent);
+    discountAmountCents = Math.round((basePriceCents * discountPercent) / 100);
+    finalPriceCents = Math.max(basePriceCents - discountAmountCents, 0);
+    commissionAmountCents = Math.round((finalPriceCents * commissionPercent) / 100);
+  }
+
+  return {
+    basePriceCents,
+    referralId,
+    referralCode,
+    discountPercent,
+    discountAmountCents,
+    finalPriceCents,
+    commissionPercent,
+    commissionAmountCents,
+    referralPaidCents,
+  };
+};
+
+const insertOrderRecord = async (payload, pricing) => {
+  const { rows } = await pool.query(
+    `INSERT INTO orders (
+      product_id,
+      product_name,
+      customer_name,
+      first_name,
+      last_name,
+      birth_date,
+      birth_time,
+      birth_place,
+      city,
+      country,
+      email,
+      gender,
+      note,
+      consultation_description,
+      language,
+      referral_id,
+      referral_code,
+      base_price_cents,
+      discount_percent,
+      discount_amount_cents,
+      final_price_cents,
+      referral_commission_percent,
+      referral_commission_cents,
+      referral_paid_cents,
+      referral_paid,
+      referral_paid_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+    RETURNING id`,
+    [
+      payload.product_id,
+      payload.product_name,
+      payload.customer_name,
+      payload.first_name,
+      payload.last_name,
+      payload.birth_date,
+      payload.birth_time,
+      payload.birth_place,
+      payload.city,
+      payload.country,
+      payload.email,
+      payload.gender,
+      payload.note || null,
+      payload.consultation_description || null,
+      payload.language,
+      pricing.referralId,
+      pricing.referralCode,
+      pricing.basePriceCents,
+      pricing.discountPercent,
+      pricing.discountAmountCents,
+      pricing.finalPriceCents,
+      pricing.commissionPercent,
+      pricing.commissionAmountCents,
+      pricing.referralPaidCents,
+      false,
+      null,
+    ]
+  );
+
+  return rows[0]?.id;
+};
+
+const fulfillOrderFromRow = async (order, timezoneOverride) => {
+  const normalizedLanguage = getSupportedLanguage(order.language);
+
+  await sendOrderNotifications({
+    customerName: order.customer_name,
+    email: order.email,
+    productName: order.product_name,
+    birthDate: order.birth_date,
+    birthPlace: order.birth_place,
+    birthTime: order.birth_time,
+    note: order.note,
+    language: normalizedLanguage,
+  });
+
+  const plan = horoscopeSubscriptionPlans.get(order.product_id);
+  if (!plan) return;
+
+  try {
+    const subscription = await createHoroscopeSubscription({
+      orderId: order.id,
+      email: order.email,
+      firstName: order.first_name,
+      lastName: order.last_name,
+      birthDate: order.birth_date,
+      birthTime: order.birth_time,
+      gender: normalizeGender(order.gender),
+      language: normalizedLanguage,
+      timezone: timezoneOverride || horoscopeDefaultTimezone,
+      plan,
+      sendNow: true,
+    });
+
+    if (subscription) {
+      if (!openai || !resendApiKey || !resendFromEmail) {
+        console.warn('Daily horoscope send skipped: OpenAI/Resend not configured.');
+      } else {
+        const sendAt = new Date();
+        setTimeout(() => {
+          deliverSubscriptionHoroscope(subscription, new Map(), {
+            sendAt,
+            forceNextDay: true,
+            isImmediate: true,
+          }).catch((sendError) => {
+            console.error('Failed to send initial horoscope:', sendError);
+          });
+        }, 0);
+      }
+    }
+  } catch (subscriptionError) {
+    console.error('Failed to create horoscope subscription:', subscriptionError);
+  }
 };
 
 const normalizeReferralCode = (value) => String(value || '').trim().toUpperCase();
@@ -1757,6 +1995,76 @@ app.use(
   })
 );
 app.use('/uploads', express.static(uploadsDir));
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !stripeWebhookSecret) {
+    return res.status(500).send('Stripe webhook not configured');
+  }
+
+  const signature = req.headers['stripe-signature'];
+  if (!signature) {
+    return res.status(400).send('Missing Stripe signature');
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, signature, stripeWebhookSecret);
+  } catch (error) {
+    console.error('Stripe webhook signature error:', error);
+    return res.status(400).send('Invalid signature');
+  }
+
+  if (!pool) {
+    return res.status(500).send('Database not configured');
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const orderId = Number(session?.metadata?.order_id || session?.client_reference_id);
+      if (Number.isInteger(orderId) && orderId > 0) {
+        const { rows } = await pool.query(
+          `SELECT
+            id,
+            product_id,
+            product_name,
+            customer_name,
+            first_name,
+            last_name,
+            birth_date,
+            birth_time,
+            birth_place,
+            email,
+            gender,
+            note,
+            language,
+            status
+          FROM orders
+          WHERE id = $1
+          LIMIT 1`,
+          [orderId]
+        );
+        const order = rows[0];
+        if (order) {
+          const { rowCount } = await pool.query(
+            `UPDATE orders
+             SET status = 'processing'
+             WHERE id = $1 AND status = 'pending'`,
+            [orderId]
+          );
+          if (rowCount) {
+            const timezoneOverride = session?.metadata?.timezone || null;
+            await fulfillOrderFromRow(order, timezoneOverride);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Stripe webhook handling error:', error);
+    return res.status(500).send('Webhook handler failed');
+  }
+
+  return res.json({ received: true });
+});
 app.use(express.json());
 
 // Simple rate limit for LLM endpoint (per IP)
@@ -1892,168 +2200,45 @@ app.post('/api/orders', async (req, res) => {
     return res.status(500).json({ error: 'Database not configured' });
   }
 
-  const {
-    product_id,
-    product_name,
-    customer_name,
-    first_name,
-    last_name,
-    birth_date,
-    birth_time,
-    birth_place,
-    city,
-    country,
-    email,
-    note,
-    consultation_description,
-    language,
-    timezone,
-    gender,
-    referral_code,
-  } = req.body || {};
-
-  const normalizedBirthTime = String(birth_time || '').trim();
-  const normalizedGender = normalizeGender(gender);
-  const normalizedLanguage = getSupportedLanguage(language);
-
-  if (
-    !product_id ||
-    !product_name ||
-    !customer_name ||
-    !first_name ||
-    !last_name ||
-    !birth_date ||
-    !normalizedBirthTime ||
-    !birth_place ||
-    !city ||
-    !country ||
-    !email
-  ) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  const built = buildOrderPayload(req.body);
+  if (built.error) {
+    return res.status(400).json({ error: built.error });
   }
 
-  const basePriceCents = getProductPriceCents(product_id);
-  let referralId = null;
-  let referralCode = null;
-  let discountPercent = 0;
-  let discountAmountCents = 0;
-  let finalPriceCents = basePriceCents;
-  let commissionPercent = 0;
-  let commissionAmountCents = 0;
-  let referralPaidCents = 0;
-
-  const normalizedReferralCode = normalizeReferralCode(referral_code);
-  if (normalizedReferralCode) {
-    try {
-      const { rows: referralRows } = await pool.query(
-        `SELECT id, code, discount_percent, commission_percent, is_active
-         FROM referrals
-         WHERE code = $1
-         LIMIT 1`,
-        [normalizedReferralCode]
-      );
-      const referral = referralRows[0];
-      if (!referral || !referral.is_active) {
-        return res.status(400).json({ error: 'Invalid referral code' });
-      }
-      referralId = referral.id;
-      referralCode = referral.code;
-      discountPercent = clampPercent(referral.discount_percent);
-      commissionPercent = clampPercent(referral.commission_percent);
-      discountAmountCents = Math.round((basePriceCents * discountPercent) / 100);
-      finalPriceCents = Math.max(basePriceCents - discountAmountCents, 0);
-      commissionAmountCents = Math.round((finalPriceCents * commissionPercent) / 100);
-    } catch (error) {
-      console.error('Failed to validate referral code:', error);
-      return res.status(500).json({ error: 'Failed to validate referral code' });
-    }
-  }
+  const payload = built.data;
 
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO orders (
-        product_id,
-        product_name,
-        customer_name,
-        first_name,
-        last_name,
-        birth_date,
-        birth_time,
-        birth_place,
-        city,
-        country,
-        email,
-        gender,
-        note,
-        consultation_description,
-        language,
-        referral_id,
-        referral_code,
-        base_price_cents,
-        discount_percent,
-        discount_amount_cents,
-        final_price_cents,
-        referral_commission_percent,
-        referral_commission_cents,
-        referral_paid_cents,
-        referral_paid,
-        referral_paid_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-      RETURNING id`,
-      [
-        product_id,
-        product_name,
-        customer_name,
-        first_name,
-        last_name,
-        birth_date,
-        normalizedBirthTime,
-        birth_place,
-        city,
-        country,
-        email,
-        normalizedGender,
-        note || null,
-        consultation_description || null,
-        normalizedLanguage,
-        referralId,
-        referralCode,
-        basePriceCents,
-        discountPercent,
-        discountAmountCents,
-        finalPriceCents,
-        commissionPercent,
-        commissionAmountCents,
-        referralPaidCents,
-        false,
-        null,
-      ]
-    );
+    const pricing = await getOrderPricing(payload);
+    if (pricing.error) {
+      return res.status(400).json({ error: pricing.error });
+    }
+
+    const orderId = await insertOrderRecord(payload, pricing);
 
     sendOrderNotifications({
-      customerName: customer_name,
-      email,
-      productName: product_name,
-      birthDate: birth_date,
-      birthPlace: birth_place,
-      birthTime: normalizedBirthTime,
-      note,
-      language: normalizedLanguage,
+      customerName: payload.customer_name,
+      email: payload.email,
+      productName: payload.product_name,
+      birthDate: payload.birth_date,
+      birthPlace: payload.birth_place,
+      birthTime: payload.birth_time,
+      note: payload.note,
+      language: payload.language,
     });
 
-    const plan = horoscopeSubscriptionPlans.get(product_id);
+    const plan = horoscopeSubscriptionPlans.get(payload.product_id);
     if (plan) {
       try {
         const subscription = await createHoroscopeSubscription({
-          orderId: rows[0]?.id,
-          email,
-          firstName: first_name,
-          lastName: last_name,
-          birthDate: birth_date,
-          birthTime: normalizedBirthTime,
-          gender: normalizedGender,
-          language: normalizedLanguage,
-          timezone,
+          orderId,
+          email: payload.email,
+          firstName: payload.first_name,
+          lastName: payload.last_name,
+          birthDate: payload.birth_date,
+          birthTime: payload.birth_time,
+          gender: payload.gender,
+          language: payload.language,
+          timezone: payload.timezone,
           plan,
           sendNow: true,
         });
@@ -2079,10 +2264,84 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
-    return res.status(201).json({ success: true, orderId: rows[0]?.id });
+    return res.status(201).json({ success: true, orderId });
   } catch (error) {
     console.error('Failed to create order:', error);
     return res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+app.post('/api/stripe/create-checkout-session', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+  if (!stripe) {
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const built = buildOrderPayload(req.body);
+  if (built.error) {
+    return res.status(400).json({ error: built.error });
+  }
+
+  const payload = built.data;
+
+  try {
+    const pricing = await getOrderPricing(payload);
+    if (pricing.error) {
+      return res.status(400).json({ error: pricing.error });
+    }
+
+    if (!pricing.finalPriceCents || pricing.finalPriceCents <= 0) {
+      return res.status(400).json({ error: 'Free orders do not require checkout' });
+    }
+
+    const orderId = await insertOrderRecord(payload, pricing);
+    if (!orderId) {
+      return res.status(500).json({ error: 'Failed to create order' });
+    }
+
+    const frontendBase = normalizeOrigin(frontendUrl) || normalizedApiBaseUrl;
+    const successUrl = `${frontendBase}/order-success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${frontendBase}/order-cancel`;
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        submit_type: 'pay',
+        customer_email: payload.email,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        client_reference_id: String(orderId),
+        metadata: {
+          order_id: String(orderId),
+          product_id: String(payload.product_id || ''),
+          referral_code: String(pricing.referralCode || ''),
+          timezone: String(payload.timezone || ''),
+        },
+        line_items: [
+          {
+            price_data: {
+              currency: 'eur',
+              product_data: {
+                name: payload.product_name,
+              },
+              unit_amount: pricing.finalPriceCents,
+            },
+            quantity: 1,
+          },
+        ],
+      });
+    } catch (error) {
+      await pool.query('DELETE FROM orders WHERE id = $1', [orderId]);
+      throw error;
+    }
+
+    return res.json({ id: session.id });
+  } catch (error) {
+    console.error('Failed to create Stripe checkout session:', error);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
