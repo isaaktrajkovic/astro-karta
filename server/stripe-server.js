@@ -2981,6 +2981,38 @@ app.get('/api/horoscope/unsubscribe', async (req, res) => {
     return res.status(400).send('Invalid unsubscribe token');
   }
 
+  const confirm = String(req.query.confirm || '').trim();
+  if (confirm !== '1') {
+    const confirmUrl = `${normalizedApiBaseUrl}/api/horoscope/unsubscribe?token=${encodeURIComponent(token)}&confirm=1`;
+    const cancelUrl = frontendUrl || normalizedApiBaseUrl;
+    return res.status(200).send(`
+      <div style="font-family: Arial, sans-serif; background: #0b0a13; color: #e8e4ff; padding: 40px; text-align: center;">
+        <h1 style="margin-bottom: 12px;">Potvrda odjave</h1>
+        <p style="margin: 0 0 16px;">Da li ste sigurni da želite da se odjavite sa dnevnog horoskopa?</p>
+        <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+          <a href="${confirmUrl}" style="background: #7c6bf5; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 999px;">
+            Odjavi me
+          </a>
+          <a href="${cancelUrl}" style="color: #8a82b8; text-decoration: underline; padding: 10px 18px;">
+            Odustani
+          </a>
+        </div>
+      </div>
+      <script>
+        (function () {
+          var confirmUrl = ${JSON.stringify(confirmUrl)};
+          var cancelUrl = ${JSON.stringify(cancelUrl)};
+          var confirmed = window.confirm('Da li ste sigurni da želite da se odjavite sa dnevnog horoskopa?');
+          if (confirmed) {
+            window.location.href = confirmUrl;
+          } else if (cancelUrl) {
+            window.location.href = cancelUrl;
+          }
+        })();
+      </script>
+    `);
+  }
+
   try {
     const { rowCount } = await pool.query(
       `UPDATE horoscope_subscriptions
