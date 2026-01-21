@@ -291,7 +291,7 @@ export const createOrder = (payload: CreateOrderPayload) =>
   });
 
 export const createStripeCheckoutSession = (payload: CreateOrderPayload) =>
-  request<{ id: string }>('/api/stripe/create-checkout-session', {
+  request<{ id: string; url: string | null }>('/api/stripe/create-checkout-session', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
