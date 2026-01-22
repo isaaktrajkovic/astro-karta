@@ -112,6 +112,7 @@ const Dashboard = () => {
   const [reportMessage, setReportMessage] = useState('');
   const [reportIsSending, setReportIsSending] = useState(false);
   const [ordersCollapsed, setOrdersCollapsed] = useState(false);
+  const [activeSection, setActiveSection] = useState<'orders' | 'referrals' | 'blog' | null>(null);
   const [referralsCollapsed, setReferralsCollapsed] = useState(false);
   const [blogCollapsed, setBlogCollapsed] = useState(false);
   const [referrals, setReferrals] = useState<Referral[]>([]);
@@ -1095,16 +1096,20 @@ const Dashboard = () => {
     count,
     onClick,
     icon: Icon,
+    isActive = false,
   }: {
     title: string;
     description: string;
     count?: number;
     onClick: () => void;
     icon: typeof Package;
+    isActive?: boolean;
   }) => (
     <button
       onClick={onClick}
-      className="group relative bg-card p-5 rounded-xl border border-border hover:border-primary/50 transition-all text-left w-full"
+      className={`group relative bg-card p-5 rounded-xl border transition-all text-left w-full ${
+        isActive ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -1128,18 +1133,30 @@ const Dashboard = () => {
   };
 
   const openOrdersSection = () => {
-    setOrdersCollapsed(false);
-    scrollToSection(ordersSectionRef);
+    const isOpening = activeSection !== 'orders';
+    setActiveSection(isOpening ? 'orders' : null);
+    if (isOpening) {
+      setOrdersCollapsed(false);
+      scrollToSection(ordersSectionRef);
+    }
   };
 
   const openReferralsSection = () => {
-    setReferralsCollapsed(false);
-    scrollToSection(referralsSectionRef);
+    const isOpening = activeSection !== 'referrals';
+    setActiveSection(isOpening ? 'referrals' : null);
+    if (isOpening) {
+      setReferralsCollapsed(false);
+      scrollToSection(referralsSectionRef);
+    }
   };
 
   const openBlogSection = () => {
-    setBlogCollapsed(false);
-    scrollToSection(blogSectionRef);
+    const isOpening = activeSection !== 'blog';
+    setActiveSection(isOpening ? 'blog' : null);
+    if (isOpening) {
+      setBlogCollapsed(false);
+      scrollToSection(blogSectionRef);
+    }
   };
 
   return (
@@ -1311,6 +1328,7 @@ const Dashboard = () => {
               count={orders.length}
               icon={Package}
               onClick={openOrdersSection}
+              isActive={activeSection === 'orders'}
             />
             <SectionTile
               title={language === 'sr' ? 'Referali' : 'Referrals'}
@@ -1318,29 +1336,39 @@ const Dashboard = () => {
               count={referrals.length}
               icon={Tag}
               onClick={openReferralsSection}
+              isActive={activeSection === 'referrals'}
             />
             <SectionTile
               title={language === 'sr' ? 'Blog' : 'Blog'}
               description={language === 'sr' ? 'Objave i mediji' : 'Posts and media'}
               icon={StickyNote}
               onClick={openBlogSection}
+              isActive={activeSection === 'blog'}
             />
             <SectionTile
               title={language === 'sr' ? 'Kalkulator' : 'Calculator'}
               description={language === 'sr' ? 'Korišćenje i statistika' : 'Usage and stats'}
               count={calculatorUsageCount}
               icon={Calculator}
-              onClick={() => setUsageDialogOpen(true)}
+              onClick={() => {
+                setActiveSection(null);
+                setUsageDialogOpen(true);
+              }}
             />
             <SectionTile
               title={language === 'sr' ? 'Horoskop' : 'Horoscope'}
               description={language === 'sr' ? 'Dnevna slanja' : 'Daily sends'}
               icon={Sparkles}
-              onClick={() => setHoroscopeDialogOpen(true)}
+              onClick={() => {
+                setActiveSection(null);
+                setHoroscopeDialogOpen(true);
+              }}
             />
           </div>
         </div>
 
+        {activeSection === 'orders' && (
+          <>
         {/* Stats - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
           <StatCard
@@ -1604,8 +1632,11 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+          </>
+        )}
 
         {/* Referrals Section */}
+        {activeSection === 'referrals' && (
         <div ref={referralsSectionRef} className="mt-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -1913,8 +1944,10 @@ const Dashboard = () => {
           </div>
           )}
         </div>
+        )}
 
         {/* Blog Section */}
+        {activeSection === 'blog' && (
         <div ref={blogSectionRef} className="mt-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -2095,6 +2128,7 @@ const Dashboard = () => {
           </div>
           )}
         </div>
+        )}
 
         <CalculatorUsageDialog 
           open={usageDialogOpen} 
