@@ -1,10 +1,16 @@
+import { useEffect } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { trackOrderSuccessView } from '@/lib/analytics';
 
 const OrderSuccess = () => {
   const { language } = useLanguage();
+
+  useEffect(() => {
+    trackOrderSuccessView();
+  }, []);
 
   return (
     <div className="min-h-screen pt-24 pb-16">

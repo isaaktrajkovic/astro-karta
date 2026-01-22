@@ -62,6 +62,15 @@ const compatibilityCacheTtlMs = Number(process.env.COMPATIBILITY_CACHE_TTL_MS ||
 const compatibilityCacheMax = Number(process.env.COMPATIBILITY_CACHE_MAX || 500);
 const compatibilityCache = new Map();
 const dailyContextCache = new Map();
+const analyticsEventTypes = new Set([
+  'page_view',
+  'order_view',
+  'order_success_view',
+  'checkout_started',
+  'order_created',
+  'order_completed',
+]);
+const orderCurrency = 'EUR';
 
 const uploadsDir = path.join(__dirname, 'uploads');
 const blogUploadsDir = path.join(uploadsDir, 'blog');
@@ -676,12 +685,28 @@ const buildOrderPayload = (body) => {
     timezone,
     gender,
     referral_code,
+    utm_source,
+    utm_medium,
+    utm_campaign,
+    utm_term,
+    utm_content,
+    referrer,
+    landing_path,
+    session_id,
   } = body || {};
 
   const normalizedBirthTime = String(birth_time || '').trim();
   const normalizedGender = normalizeGender(gender);
   const normalizedLanguage = getSupportedLanguage(language);
   const normalizedCustomerName = String(customer_name || `${first_name || ''} ${last_name || ''}`).trim();
+  const normalizedUtmSource = normalizeAnalyticsValue(utm_source, 120);
+  const normalizedUtmMedium = normalizeAnalyticsValue(utm_medium, 120);
+  const normalizedUtmCampaign = normalizeAnalyticsValue(utm_campaign, 160);
+  const normalizedUtmTerm = normalizeAnalyticsValue(utm_term, 160);
+  const normalizedUtmContent = normalizeAnalyticsValue(utm_content, 160);
+  const normalizedReferrer = normalizeAnalyticsValue(referrer, 800);
+  const normalizedLandingPath = normalizeAnalyticsValue(landing_path, 400);
+  const normalizedSessionId = normalizeAnalyticsValue(session_id, 120);
 
   if (
     !product_id ||
@@ -718,6 +743,14 @@ const buildOrderPayload = (body) => {
       language: normalizedLanguage,
       timezone,
       referral_code,
+      utm_source: normalizedUtmSource,
+      utm_medium: normalizedUtmMedium,
+      utm_campaign: normalizedUtmCampaign,
+      utm_term: normalizedUtmTerm,
+      utm_content: normalizedUtmContent,
+      referrer: normalizedReferrer,
+      landing_path: normalizedLandingPath,
+      session_id: normalizedSessionId,
     },
   };
 };
@@ -786,6 +819,14 @@ const insertOrderRecord = async (payload, pricing) => {
       note,
       consultation_description,
       language,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_term,
+      utm_content,
+      referrer,
+      landing_path,
+      session_id,
       referral_id,
       referral_code,
       base_price_cents,
@@ -797,7 +838,7 @@ const insertOrderRecord = async (payload, pricing) => {
       referral_paid_cents,
       referral_paid,
       referral_paid_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
     RETURNING id`,
     [
       payload.product_id,
@@ -815,6 +856,14 @@ const insertOrderRecord = async (payload, pricing) => {
       payload.note || null,
       payload.consultation_description || null,
       payload.language,
+      payload.utm_source || null,
+      payload.utm_medium || null,
+      payload.utm_campaign || null,
+      payload.utm_term || null,
+      payload.utm_content || null,
+      payload.referrer || null,
+      payload.landing_path || null,
+      payload.session_id || null,
       pricing.referralId,
       pricing.referralCode,
       pricing.basePriceCents,
@@ -830,6 +879,66 @@ const insertOrderRecord = async (payload, pricing) => {
   );
 
   return rows[0]?.id;
+};
+
+const logOrderCreatedEvent = async (orderId, payload, pricing) => {
+  if (!orderId) return;
+  await logAnalyticsEvent({
+    event_type: 'order_created',
+    order_id: orderId,
+    product_id: payload.product_id,
+    value_cents: pricing.finalPriceCents,
+    currency: orderCurrency,
+    referral_code: pricing.referralCode || payload.referral_code || null,
+    utm_source: payload.utm_source,
+    utm_medium: payload.utm_medium,
+    utm_campaign: payload.utm_campaign,
+    utm_term: payload.utm_term,
+    utm_content: payload.utm_content,
+    referrer: payload.referrer,
+    path: payload.landing_path,
+    session_id: payload.session_id,
+  });
+};
+
+const logCheckoutStartedEvent = async (orderId, payload, pricing) => {
+  if (!orderId) return;
+  await logAnalyticsEvent({
+    event_type: 'checkout_started',
+    order_id: orderId,
+    product_id: payload.product_id,
+    value_cents: pricing.finalPriceCents,
+    currency: orderCurrency,
+    referral_code: pricing.referralCode || payload.referral_code || null,
+    utm_source: payload.utm_source,
+    utm_medium: payload.utm_medium,
+    utm_campaign: payload.utm_campaign,
+    utm_term: payload.utm_term,
+    utm_content: payload.utm_content,
+    referrer: payload.referrer,
+    path: payload.landing_path,
+    session_id: payload.session_id,
+  });
+};
+
+const logOrderCompletedEvent = async (order) => {
+  if (!order?.id) return;
+  await logAnalyticsEvent({
+    event_type: 'order_completed',
+    order_id: order.id,
+    product_id: order.product_id,
+    value_cents: order.final_price_cents,
+    currency: orderCurrency,
+    referral_code: order.referral_code,
+    utm_source: order.utm_source,
+    utm_medium: order.utm_medium,
+    utm_campaign: order.utm_campaign,
+    utm_term: order.utm_term,
+    utm_content: order.utm_content,
+    referrer: order.referrer,
+    path: order.landing_path,
+    session_id: order.session_id,
+  });
 };
 
 const fulfillOrderFromRow = async (order, timezoneOverride) => {
@@ -1117,6 +1226,106 @@ const escapeHtml = (value) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const normalizeAnalyticsValue = (value, maxLen = 300) => {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) : trimmed;
+};
+
+const normalizeAnalyticsCents = (value) => {
+  if (value === null || value === undefined) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0, Math.floor(numeric));
+};
+
+const getReferrerHost = (referrer) => {
+  const normalized = normalizeAnalyticsValue(referrer, 800);
+  if (!normalized) return null;
+  try {
+    return new URL(normalized).hostname || null;
+  } catch {
+    return null;
+  }
+};
+
+const buildAnalyticsEvent = (payload = {}) => {
+  const eventType = normalizeAnalyticsValue(payload.event_type, 80);
+  if (!eventType || !analyticsEventTypes.has(eventType)) {
+    return null;
+  }
+
+  const referrer = normalizeAnalyticsValue(payload.referrer, 800);
+  return {
+    event_type: eventType,
+    path: normalizeAnalyticsValue(payload.path, 400),
+    referrer,
+    referrer_host: getReferrerHost(referrer),
+    utm_source: normalizeAnalyticsValue(payload.utm_source, 120),
+    utm_medium: normalizeAnalyticsValue(payload.utm_medium, 120),
+    utm_campaign: normalizeAnalyticsValue(payload.utm_campaign, 160),
+    utm_term: normalizeAnalyticsValue(payload.utm_term, 160),
+    utm_content: normalizeAnalyticsValue(payload.utm_content, 160),
+    referral_code: normalizeAnalyticsValue(payload.referral_code, 120),
+    product_id: normalizeAnalyticsValue(payload.product_id, 120),
+    order_id: Number.isInteger(Number(payload.order_id)) ? Number(payload.order_id) : null,
+    value_cents: normalizeAnalyticsCents(payload.value_cents),
+    currency: normalizeAnalyticsValue(payload.currency, 12),
+    session_id: normalizeAnalyticsValue(payload.session_id, 120),
+    user_agent: normalizeAnalyticsValue(payload.user_agent, 240),
+  };
+};
+
+const logAnalyticsEvent = async (payload) => {
+  if (!pool) return;
+  const event = buildAnalyticsEvent(payload);
+  if (!event) return;
+
+  try {
+    await pool.query(
+      `INSERT INTO analytics_events (
+        event_type,
+        path,
+        referrer,
+        referrer_host,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_term,
+        utm_content,
+        referral_code,
+        product_id,
+        order_id,
+        value_cents,
+        currency,
+        session_id,
+        user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+      [
+        event.event_type,
+        event.path,
+        event.referrer,
+        event.referrer_host,
+        event.utm_source,
+        event.utm_medium,
+        event.utm_campaign,
+        event.utm_term,
+        event.utm_content,
+        event.referral_code,
+        event.product_id,
+        event.order_id,
+        event.value_cents,
+        event.currency,
+        event.session_id,
+        event.user_agent,
+      ]
+    );
+  } catch (error) {
+    console.error('Failed to store analytics event:', error);
+  }
+};
 
 const formatBirthDateForEmail = (birthDate, language) => {
   if (!birthDate) return '';
@@ -2087,6 +2296,16 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             gender,
             note,
             language,
+            final_price_cents,
+            referral_code,
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            utm_term,
+            utm_content,
+            referrer,
+            landing_path,
+            session_id,
             status
           FROM orders
           WHERE id = $1
@@ -2105,6 +2324,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             const timezoneOverride = session?.metadata?.timezone || null;
             await fulfillOrderFromRow(order, timezoneOverride);
           }
+          logOrderCompletedEvent(order);
         }
       }
     }
@@ -2116,6 +2336,43 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   return res.json({ received: true });
 });
 app.use(express.json());
+
+const parseAnalyticsDate = (value) => {
+  if (!value) return null;
+  const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const buildAnalyticsWhere = (filters) => {
+  const clauses = ['created_at >= $1', 'created_at < $2'];
+  const values = [filters.from, filters.to];
+
+  const add = (field, value) => {
+    if (!value) return;
+    values.push(value);
+    clauses.push(`${field} = $${values.length}`);
+  };
+
+  add('utm_source', filters.utm_source);
+  add('utm_campaign', filters.utm_campaign);
+  add('referral_code', filters.referral_code);
+  add('product_id', filters.product_id);
+
+  return { where: clauses.join(' AND '), values };
+};
+
+app.post('/api/analytics/event', async (req, res) => {
+  await logAnalyticsEvent({
+    ...req.body,
+    user_agent: req.headers['user-agent'],
+  });
+  return res.json({ success: true });
+});
 
 // Simple rate limit for LLM endpoint (per IP)
 const llmLimiter = rateLimit({
@@ -2209,6 +2466,158 @@ app.get('/api/auth/session', requireAuth, (req, res) => {
   res.json({ user: { email: req.user?.email || '' } });
 });
 
+app.get('/api/analytics/summary', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const now = new Date();
+  const defaultTo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const defaultFrom = new Date(defaultTo);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
+
+  const fromParam = parseAnalyticsDate(req.query.from);
+  const toParam = parseAnalyticsDate(req.query.to);
+  const fromDate = fromParam || defaultFrom;
+  const toDate = toParam || defaultTo;
+  const toExclusive = new Date(toDate);
+  toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+
+  const normalizeFilter = (value, maxLen = 160) => {
+    const normalized = normalizeAnalyticsValue(value, maxLen);
+    if (!normalized || normalized === 'all') return null;
+    return normalized;
+  };
+
+  const filters = {
+    from: fromDate.toISOString(),
+    to: toExclusive.toISOString(),
+    utm_source: normalizeFilter(req.query.utm_source, 120),
+    utm_campaign: normalizeFilter(req.query.utm_campaign, 160),
+    referral_code: normalizeFilter(req.query.referral_code, 120),
+    product_id: normalizeFilter(req.query.product_id, 120),
+  };
+
+  const { where, values } = buildAnalyticsWhere(filters);
+
+  try {
+    const { rows: totalsRows } = await pool.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+        COUNT(DISTINCT session_id) FILTER (WHERE event_type = 'page_view' AND session_id IS NOT NULL)::int AS unique_visitors,
+        COUNT(*) FILTER (WHERE event_type = 'order_created')::int AS order_created,
+        COUNT(*) FILTER (WHERE event_type = 'checkout_started')::int AS checkout_started,
+        COUNT(*) FILTER (WHERE event_type = 'order_completed')::int AS order_completed,
+        COALESCE(SUM(value_cents) FILTER (WHERE event_type = 'order_completed'), 0)::int AS revenue_cents
+       FROM analytics_events
+       WHERE ${where}`,
+      values
+    );
+
+    const { rows: dailyRows } = await pool.query(
+      `SELECT
+        TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+        COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+        COUNT(DISTINCT session_id) FILTER (WHERE event_type = 'page_view' AND session_id IS NOT NULL)::int AS unique_visitors,
+        COUNT(*) FILTER (WHERE event_type = 'order_created')::int AS order_created,
+        COUNT(*) FILTER (WHERE event_type = 'order_completed')::int AS order_completed,
+        COALESCE(SUM(value_cents) FILTER (WHERE event_type = 'order_completed'), 0)::int AS revenue_cents
+       FROM analytics_events
+       WHERE ${where}
+       GROUP BY date
+       ORDER BY date ASC`,
+      values
+    );
+
+    const { rows: pageRows } = await pool.query(
+      `SELECT path, COUNT(*)::int AS count
+       FROM analytics_events
+       WHERE ${where} AND event_type = 'page_view' AND path IS NOT NULL
+       GROUP BY path
+       ORDER BY count DESC
+       LIMIT 10`,
+      values
+    );
+
+    const { rows: referrerRows } = await pool.query(
+      `SELECT referrer_host AS referrer, COUNT(*)::int AS count
+       FROM analytics_events
+       WHERE ${where} AND event_type = 'page_view' AND referrer_host IS NOT NULL
+       GROUP BY referrer_host
+       ORDER BY count DESC
+       LIMIT 10`,
+      values
+    );
+
+    const { rows: productRows } = await pool.query(
+      `SELECT
+        product_id,
+        COUNT(*) FILTER (WHERE event_type = 'order_created')::int AS order_created,
+        COUNT(*) FILTER (WHERE event_type = 'order_completed')::int AS order_completed,
+        COALESCE(SUM(value_cents) FILTER (WHERE event_type = 'order_completed'), 0)::int AS revenue_cents
+       FROM analytics_events
+       WHERE ${where} AND product_id IS NOT NULL
+       GROUP BY product_id
+       ORDER BY order_created DESC`,
+      values
+    );
+
+    const optionValues = [filters.from, filters.to];
+    const { rows: sourceRows } = await pool.query(
+      `SELECT DISTINCT utm_source
+       FROM analytics_events
+       WHERE created_at >= $1 AND created_at < $2 AND utm_source IS NOT NULL
+       ORDER BY utm_source`,
+      optionValues
+    );
+    const { rows: campaignRows } = await pool.query(
+      `SELECT DISTINCT utm_campaign
+       FROM analytics_events
+       WHERE created_at >= $1 AND created_at < $2 AND utm_campaign IS NOT NULL
+       ORDER BY utm_campaign`,
+      optionValues
+    );
+    const { rows: referralRows } = await pool.query(
+      `SELECT DISTINCT referral_code
+       FROM analytics_events
+       WHERE created_at >= $1 AND created_at < $2 AND referral_code IS NOT NULL
+       ORDER BY referral_code`,
+      optionValues
+    );
+    const { rows: productOptions } = await pool.query(
+      `SELECT DISTINCT product_id
+       FROM analytics_events
+       WHERE created_at >= $1 AND created_at < $2 AND product_id IS NOT NULL
+       ORDER BY product_id`,
+      optionValues
+    );
+
+    return res.json({
+      totals: totalsRows[0] || {
+        page_views: 0,
+        unique_visitors: 0,
+        order_created: 0,
+        checkout_started: 0,
+        order_completed: 0,
+        revenue_cents: 0,
+      },
+      daily: dailyRows || [],
+      top_pages: pageRows || [],
+      top_referrers: referrerRows || [],
+      top_products: productRows || [],
+      options: {
+        utm_sources: sourceRows.map((row) => row.utm_source),
+        utm_campaigns: campaignRows.map((row) => row.utm_campaign),
+        referral_codes: referralRows.map((row) => row.referral_code),
+        products: productOptions.map((row) => row.product_id),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch analytics summary:', error);
+    return res.status(500).json({ error: 'Failed to fetch analytics summary' });
+  }
+});
+
 app.post('/api/admins', requireAuth, async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: 'Database not configured' });
@@ -2264,6 +2673,23 @@ app.post('/api/orders', async (req, res) => {
     }
 
     const orderId = await insertOrderRecord(payload, pricing);
+    await logOrderCreatedEvent(orderId, payload, pricing);
+    if (pricing.finalPriceCents <= 0) {
+      await logOrderCompletedEvent({
+        id: orderId,
+        product_id: payload.product_id,
+        final_price_cents: pricing.finalPriceCents,
+        referral_code: pricing.referralCode || payload.referral_code || null,
+        utm_source: payload.utm_source,
+        utm_medium: payload.utm_medium,
+        utm_campaign: payload.utm_campaign,
+        utm_term: payload.utm_term,
+        utm_content: payload.utm_content,
+        referrer: payload.referrer,
+        landing_path: payload.landing_path,
+        session_id: payload.session_id,
+      });
+    }
 
     sendOrderNotifications({
       customerName: payload.customer_name,
@@ -2387,6 +2813,9 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
       await pool.query('DELETE FROM orders WHERE id = $1', [orderId]);
       throw error;
     }
+
+    await logOrderCreatedEvent(orderId, payload, pricing);
+    await logCheckoutStartedEvent(orderId, payload, pricing);
 
     return res.json({ id: session.id, url: session.url || null });
   } catch (error) {

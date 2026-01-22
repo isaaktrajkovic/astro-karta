@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS orders (
   note TEXT NULL,
   consultation_description TEXT NULL,
   language VARCHAR(8) NOT NULL DEFAULT 'sr',
+  utm_source VARCHAR(255) NULL,
+  utm_medium VARCHAR(255) NULL,
+  utm_campaign VARCHAR(255) NULL,
+  utm_term VARCHAR(255) NULL,
+  utm_content VARCHAR(255) NULL,
+  referrer TEXT NULL,
+  landing_path VARCHAR(512) NULL,
+  session_id VARCHAR(255) NULL,
   referral_id INT NULL,
   referral_code VARCHAR(64) NULL,
   base_price_cents INT NOT NULL DEFAULT 0,
@@ -129,3 +137,32 @@ CREATE INDEX horoscope_delivery_log_date_idx ON horoscope_delivery_log (horoscop
 CREATE INDEX horoscope_delivery_log_subscription_idx ON horoscope_delivery_log (subscription_id);
 
 CREATE INDEX orders_referral_idx ON orders (referral_id);
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_type VARCHAR(64) NOT NULL,
+  path VARCHAR(512) NULL,
+  referrer TEXT NULL,
+  referrer_host VARCHAR(255) NULL,
+  utm_source VARCHAR(255) NULL,
+  utm_medium VARCHAR(255) NULL,
+  utm_campaign VARCHAR(255) NULL,
+  utm_term VARCHAR(255) NULL,
+  utm_content VARCHAR(255) NULL,
+  referral_code VARCHAR(64) NULL,
+  product_id VARCHAR(255) NULL,
+  order_id INT NULL,
+  value_cents INT NULL,
+  currency VARCHAR(16) NULL,
+  session_id VARCHAR(255) NULL,
+  user_agent VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX analytics_events_created_at_idx ON analytics_events (created_at);
+CREATE INDEX analytics_events_type_idx ON analytics_events (event_type);
+CREATE INDEX analytics_events_session_idx ON analytics_events (session_id);
+CREATE INDEX analytics_events_referral_idx ON analytics_events (referral_code);
+CREATE INDEX analytics_events_path_idx ON analytics_events (path);
+CREATE INDEX analytics_events_referrer_idx ON analytics_events (referrer_host);
+CREATE INDEX analytics_events_product_idx ON analytics_events (product_id);

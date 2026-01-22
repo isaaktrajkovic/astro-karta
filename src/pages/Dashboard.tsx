@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag, Calculator } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag, Calculator, BarChart3, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { CalculatorUsageDialog } from '@/components/CalculatorUsageDialog';
 import HoroscopeAdminDialog from '@/components/HoroscopeAdminDialog';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import {
   getOrders,
   getUsage,
@@ -112,7 +113,7 @@ const Dashboard = () => {
   const [reportMessage, setReportMessage] = useState('');
   const [reportIsSending, setReportIsSending] = useState(false);
   const [ordersCollapsed, setOrdersCollapsed] = useState(false);
-  const [activeSection, setActiveSection] = useState<'orders' | 'referrals' | 'blog' | null>(null);
+  const [activeSection, setActiveSection] = useState<'orders' | 'referrals' | 'blog' | 'analytics' | null>(null);
   const [referralsCollapsed, setReferralsCollapsed] = useState(false);
   const [blogCollapsed, setBlogCollapsed] = useState(false);
   const [referrals, setReferrals] = useState<Referral[]>([]);
@@ -143,6 +144,7 @@ const Dashboard = () => {
   const ordersSectionRef = useRef<HTMLDivElement | null>(null);
   const referralsSectionRef = useRef<HTMLDivElement | null>(null);
   const blogSectionRef = useRef<HTMLDivElement | null>(null);
+  const analyticsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -1132,6 +1134,32 @@ const Dashboard = () => {
     });
   };
 
+  const getReferralLink = (code: string) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    const encoded = encodeURIComponent(code);
+    return `${base}/?ref=${encoded}&utm_source=referral&utm_campaign=${encoded}`;
+  };
+
+  const handleCopyReferralLink = async (code: string) => {
+    const link = getReferralLink(code);
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({
+        title: language === 'sr' ? 'Link kopiran' : 'Link copied',
+        description: link,
+      });
+    } catch (error) {
+      console.error('Failed to copy referral link:', error);
+      toast({
+        title: language === 'sr' ? 'GreÅ¡ka' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguÄ‡e kopirati link.'
+          : 'Could not copy link.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const openOrdersSection = () => {
     const isOpening = activeSection !== 'orders';
     setActiveSection(isOpening ? 'orders' : null);
@@ -1156,6 +1184,14 @@ const Dashboard = () => {
     if (isOpening) {
       setBlogCollapsed(false);
       scrollToSection(blogSectionRef);
+    }
+  };
+
+  const openAnalyticsSection = () => {
+    const isOpening = activeSection !== 'analytics';
+    setActiveSection(isOpening ? 'analytics' : null);
+    if (isOpening) {
+      scrollToSection(analyticsSectionRef);
     }
   };
 
@@ -1344,6 +1380,13 @@ const Dashboard = () => {
               icon={StickyNote}
               onClick={openBlogSection}
               isActive={activeSection === 'blog'}
+            />
+            <SectionTile
+              title={language === 'sr' ? 'Analitika' : 'Analytics'}
+              description={language === 'sr' ? 'Posete i porudÅ¾bine' : 'Visits and orders'}
+              icon={BarChart3}
+              onClick={openAnalyticsSection}
+              isActive={activeSection === 'analytics'}
             />
             <SectionTile
               title={language === 'sr' ? 'Kalkulator' : 'Calculator'}
@@ -1928,6 +1971,14 @@ const Dashboard = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleCopyReferralLink(referral.code)}
+                              >
+                                <Link2 className="w-4 h-4 mr-1" />
+                                {language === 'sr' ? 'Link' : 'Link'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleEditReferral(referral)}
                               >
                                 {language === 'sr' ? 'Izmeni' : 'Edit'}
@@ -2128,6 +2179,13 @@ const Dashboard = () => {
           </div>
           )}
         </div>
+        )}
+
+        {/* Analytics Section */}
+        {activeSection === 'analytics' && (
+          <div ref={analyticsSectionRef} className="mt-10">
+            <AnalyticsDashboard active={activeSection === 'analytics'} />
+          </div>
         )}
 
         <CalculatorUsageDialog 

@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderForm from '@/components/OrderForm';
 import { formatPrice } from '@/lib/utils';
+import { trackOrderView } from '@/lib/analytics';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
   'monthly-basic': { titleSr: 'Osnovni paket', titleEn: 'Basic Package', priceCents: 0 },
@@ -20,6 +22,12 @@ const Order = () => {
   const { language, t } = useLanguage();
 
   const product = productId ? productData[productId] : null;
+
+  useEffect(() => {
+    if (productId) {
+      trackOrderView(productId);
+    }
+  }, [productId]);
 
   if (!product) {
     return (

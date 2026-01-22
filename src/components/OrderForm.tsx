@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { createOrder, validateReferralCode } from '@/lib/api';
 import { startStripeCheckout } from '@/lib/stripeCheckout';
 import { formatPrice } from '@/lib/utils';
+import { getAttribution, getSessionId } from '@/lib/analytics';
 
 interface OrderFormProps {
   productId: string;
@@ -92,8 +93,8 @@ const OrderForm = ({ productId, productName, basePriceCents, isConsultation = fa
   const discountAmountCents = Math.round((basePriceCents * appliedDiscountPercent) / 100);
   const finalPriceCents = Math.max(basePriceCents - discountAmountCents, 0);
 
-  const handleApplyReferral = async () => {
-    const trimmed = referralInput.trim();
+  const applyReferralCode = async (value: string) => {
+    const trimmed = value.trim();
     if (!trimmed) {
       setAppliedReferral(null);
       setReferralStatus('idle');
@@ -118,6 +119,10 @@ const OrderForm = ({ productId, productName, basePriceCents, isConsultation = fa
       setAppliedReferral(null);
       setReferralStatus('invalid');
     }
+  };
+
+  const handleApplyReferral = async () => {
+    await applyReferralCode(referralInput);
   };
 
   const handleReferralInputChange = (value: string) => {
@@ -164,6 +169,14 @@ const OrderForm = ({ productId, productName, basePriceCents, isConsultation = fa
     mediaQuery.addEventListener('change', update);
     return () => mediaQuery.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    const { referral_code } = getAttribution();
+    if (referral_code && !appliedReferral && !referralInput) {
+      setReferralInput(referral_code);
+      applyReferralCode(referral_code);
+    }
+  }, [appliedReferral, referralInput]);
 
   const formatDayFirstDateInput = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -299,6 +312,8 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
     }
 
     const customerName = `${formData.firstName} ${formData.lastName}`.trim();
+    const attribution = getAttribution();
+    const sessionId = getSessionId();
     const payload = {
       product_id: productId,
       product_name: productName,
@@ -317,6 +332,14 @@ ${t('form.birthCountry')}: ${formData.partnerBirthCountry}
       language,
       timezone,
       referral_code: appliedReferral?.code || null,
+      utm_source: attribution.utm_source,
+      utm_medium: attribution.utm_medium,
+      utm_campaign: attribution.utm_campaign,
+      utm_term: attribution.utm_term,
+      utm_content: attribution.utm_content,
+      referrer: attribution.referrer,
+      landing_path: attribution.landing_path,
+      session_id: sessionId,
     };
 
     const preview: PreviewData = {

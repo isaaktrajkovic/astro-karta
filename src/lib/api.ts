@@ -23,6 +23,14 @@ export interface Order {
   note: string | null;
   consultation_description: string | null;
   language: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
+  referrer?: string | null;
+  landing_path?: string | null;
+  session_id?: string | null;
   referral_id: number | null;
   referral_code: string | null;
   base_price_cents: number;
@@ -154,6 +162,39 @@ export interface BlogPost {
   attachments: BlogAsset[];
   published_at: string;
   created_at: string;
+}
+
+export interface AnalyticsSummary {
+  totals: {
+    page_views: number;
+    unique_visitors: number;
+    order_created: number;
+    checkout_started: number;
+    order_completed: number;
+    revenue_cents: number;
+  };
+  daily: Array<{
+    date: string;
+    page_views: number;
+    unique_visitors: number;
+    order_created: number;
+    order_completed: number;
+    revenue_cents: number;
+  }>;
+  top_pages: Array<{ path: string; count: number }>;
+  top_referrers: Array<{ referrer: string; count: number }>;
+  top_products: Array<{
+    product_id: string;
+    order_created: number;
+    order_completed: number;
+    revenue_cents: number;
+  }>;
+  options: {
+    utm_sources: string[];
+    utm_campaigns: string[];
+    referral_codes: string[];
+    products: string[];
+  };
 }
 
 export interface ReferralUpsertPayload {
@@ -311,6 +352,29 @@ export const getUsage = () =>
     method: 'GET',
     auth: true,
   });
+
+export const getAnalyticsSummary = (params: {
+  from: string;
+  to: string;
+  utm_source?: string;
+  utm_campaign?: string;
+  referral_code?: string;
+  product_id?: string;
+}) => {
+  const searchParams = new URLSearchParams({
+    from: params.from,
+    to: params.to,
+  });
+  if (params.utm_source) searchParams.set('utm_source', params.utm_source);
+  if (params.utm_campaign) searchParams.set('utm_campaign', params.utm_campaign);
+  if (params.referral_code) searchParams.set('referral_code', params.referral_code);
+  if (params.product_id) searchParams.set('product_id', params.product_id);
+
+  return request<AnalyticsSummary>(`/api/analytics/summary?${searchParams.toString()}`, {
+    method: 'GET',
+    auth: true,
+  });
+};
 
 export const validateReferralCode = (code: string) =>
   request<{ valid: boolean; code?: string; discountPercent?: number }>(
