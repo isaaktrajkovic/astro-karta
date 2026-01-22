@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Mail, MapPin, Calendar, Clock, Package, User, Download, Filter, StickyNote, Sparkles, Trash2, Send, Tag, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from '@/hooks/use-toast';
@@ -112,6 +112,8 @@ const Dashboard = () => {
   const [reportMessage, setReportMessage] = useState('');
   const [reportIsSending, setReportIsSending] = useState(false);
   const [ordersCollapsed, setOrdersCollapsed] = useState(false);
+  const [referralsCollapsed, setReferralsCollapsed] = useState(false);
+  const [blogCollapsed, setBlogCollapsed] = useState(false);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
   const [referralOrders, setReferralOrders] = useState<ReferralOrder[]>([]);
@@ -137,6 +139,9 @@ const Dashboard = () => {
   const [blogSaving, setBlogSaving] = useState(false);
   const referralFormRef = useRef<HTMLDivElement | null>(null);
   const referralCodeInputRef = useRef<HTMLInputElement | null>(null);
+  const ordersSectionRef = useRef<HTMLDivElement | null>(null);
+  const referralsSectionRef = useRef<HTMLDivElement | null>(null);
+  const blogSectionRef = useRef<HTMLDivElement | null>(null);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -1084,6 +1089,59 @@ const Dashboard = () => {
     </button>
   );
 
+  const SectionTile = ({
+    title,
+    description,
+    count,
+    onClick,
+    icon: Icon,
+  }: {
+    title: string;
+    description: string;
+    count?: number;
+    onClick: () => void;
+    icon: typeof Package;
+  }) => (
+    <button
+      onClick={onClick}
+      className="group relative bg-card p-5 rounded-xl border border-border hover:border-primary/50 transition-all text-left w-full"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm text-muted-foreground">{description}</div>
+          <div className="text-lg font-semibold text-foreground mt-1">{title}</div>
+        </div>
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+      {typeof count === 'number' && (
+        <div className="mt-4 text-2xl font-semibold text-foreground">{count}</div>
+      )}
+    </button>
+  );
+
+  const scrollToSection = (ref: { current: HTMLDivElement | null }) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const openOrdersSection = () => {
+    setOrdersCollapsed(false);
+    scrollToSection(ordersSectionRef);
+  };
+
+  const openReferralsSection = () => {
+    setReferralsCollapsed(false);
+    scrollToSection(referralsSectionRef);
+  };
+
+  const openBlogSection = () => {
+    setBlogCollapsed(false);
+    scrollToSection(blogSectionRef);
+  };
+
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4">
@@ -1239,6 +1297,50 @@ const Dashboard = () => {
           </div>
         </div>
 
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
+              {language === 'sr' ? 'Sekcije' : 'Sections'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <SectionTile
+              title={language === 'sr' ? 'Narudžbine' : 'Orders'}
+              description={language === 'sr' ? 'Pregled i statusi' : 'Overview and status'}
+              count={orders.length}
+              icon={Package}
+              onClick={openOrdersSection}
+            />
+            <SectionTile
+              title={language === 'sr' ? 'Referali' : 'Referrals'}
+              description={language === 'sr' ? 'Kodovi i provizije' : 'Codes and commissions'}
+              count={referrals.length}
+              icon={Tag}
+              onClick={openReferralsSection}
+            />
+            <SectionTile
+              title={language === 'sr' ? 'Blog' : 'Blog'}
+              description={language === 'sr' ? 'Objave i mediji' : 'Posts and media'}
+              icon={StickyNote}
+              onClick={openBlogSection}
+            />
+            <SectionTile
+              title={language === 'sr' ? 'Kalkulator' : 'Calculator'}
+              description={language === 'sr' ? 'Korišćenje i statistika' : 'Usage and stats'}
+              count={calculatorUsageCount}
+              icon={Calculator}
+              onClick={() => setUsageDialogOpen(true)}
+            />
+            <SectionTile
+              title={language === 'sr' ? 'Horoskop' : 'Horoscope'}
+              description={language === 'sr' ? 'Dnevna slanja' : 'Daily sends'}
+              icon={Sparkles}
+              onClick={() => setHoroscopeDialogOpen(true)}
+            />
+          </div>
+        </div>
+
         {/* Stats - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
           <StatCard
@@ -1292,7 +1394,7 @@ const Dashboard = () => {
         </div>
 
         {/* Orders Table */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div ref={ordersSectionRef} className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="p-6 border-b border-border flex items-center justify-between">
             <h2 className="text-xl font-semibold text-foreground">
               {statusFilter === 'all' 
@@ -1504,15 +1606,31 @@ const Dashboard = () => {
         </div>
 
         {/* Referrals Section */}
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Tag className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold text-foreground">
-              {language === 'sr' ? 'Referal kodovi' : 'Referral codes'}
-            </h2>
+        <div ref={referralsSectionRef} className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-semibold text-foreground">
+                {language === 'sr' ? 'Referal kodovi' : 'Referral codes'}
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReferralsCollapsed((prev) => !prev)}
+            >
+              {referralsCollapsed
+                ? (language === 'sr' ? 'Prikaži' : 'Show')
+                : (language === 'sr' ? 'Sakrij' : 'Hide')}
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {referralsCollapsed ? (
+            <div className="bg-card rounded-xl border border-border p-10 text-center text-muted-foreground">
+              {language === 'sr' ? 'Sekcija za referale je sakrivena.' : 'Referral section is hidden.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div ref={referralFormRef} className="bg-card rounded-xl border border-border p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">
                 {referralEditingId
@@ -1793,18 +1911,35 @@ const Dashboard = () => {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Blog Section */}
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <StickyNote className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold text-foreground">
-              {language === 'sr' ? 'Blog objave' : 'Blog posts'}
-            </h2>
+        <div ref={blogSectionRef} className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <StickyNote className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-semibold text-foreground">
+                {language === 'sr' ? 'Blog objave' : 'Blog posts'}
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBlogCollapsed((prev) => !prev)}
+            >
+              {blogCollapsed
+                ? (language === 'sr' ? 'Prikaži' : 'Show')
+                : (language === 'sr' ? 'Sakrij' : 'Hide')}
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {blogCollapsed ? (
+            <div className="bg-card rounded-xl border border-border p-10 text-center text-muted-foreground">
+              {language === 'sr' ? 'Sekcija za blog je sakrivena.' : 'Blog section is hidden.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-card rounded-xl border border-border p-6 space-y-4">
               <h3 className="text-lg font-semibold text-foreground">
                 {language === 'sr' ? 'Postavi novu objavu' : 'Publish a new post'}
@@ -1958,6 +2093,7 @@ const Dashboard = () => {
               </ul>
             </div>
           </div>
+          )}
         </div>
 
         <CalculatorUsageDialog 

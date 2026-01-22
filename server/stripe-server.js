@@ -26,6 +26,10 @@ const adminPassword = process.env.ADMIN_PASSWORD || '';
 const resendApiKey = process.env.RESEND_API_KEY || '';
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || '';
 const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL || adminEmail;
+const adminNotificationEmails = [
+  adminNotificationEmail,
+  'irina311.ilic@gmail.com',
+].filter(Boolean);
 const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${port}`;
 const normalizedApiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
 const databaseUrl = process.env.DATABASE_URL || '';
@@ -481,6 +485,7 @@ const sendOrderNotifications = async ({
   note,
   language,
 }) => {
+  const normalizedLanguage = getSupportedLanguage(language);
   const copy = getOrderEmailCopy(language);
   const templateValues = {
     name: customerName,
@@ -488,14 +493,15 @@ const sendOrderNotifications = async ({
   };
   const heroTitle = formatOrderTemplate(copy.heroTitle, templateValues);
   const heroSubtitle = formatOrderTemplate(copy.heroSubtitle, templateValues);
-  const safeBirthDate = escapeHtml(birthDate);
+  const formattedBirthDate = formatBirthDateForEmail(birthDate, normalizedLanguage);
+  const safeBirthDate = escapeHtml(formattedBirthDate || birthDate);
   const safeBirthTime = escapeHtml(birthTime || '-');
   const safeBirthPlace = escapeHtml(birthPlace);
   const safeNote = note ? escapeHtml(note) : '';
 
-  if (adminNotificationEmail) {
+  if (adminNotificationEmails.length > 0) {
     await sendResendEmail({
-      to: adminNotificationEmail,
+      to: adminNotificationEmails,
       subject: `Nova narudžbina: ${productName}`,
       html: `
         <h1>Nova narudžbina primljena!</h1>
@@ -504,10 +510,10 @@ const sendOrderNotifications = async ({
           <li><strong>Proizvod:</strong> ${productName}</li>
           <li><strong>Ime kupca:</strong> ${customerName}</li>
           <li><strong>Email:</strong> ${email}</li>
-          <li><strong>Datum rođenja:</strong> ${birthDate}</li>
-          <li><strong>Vreme rođenja:</strong> ${birthTime || 'Nije navedeno'}</li>
-          <li><strong>Mesto rođenja:</strong> ${birthPlace}</li>
-          ${note ? `<li><strong>Napomena:</strong> ${note}</li>` : ''}
+          <li><strong>Datum rođenja:</strong> ${safeBirthDate}</li>
+          <li><strong>Vreme rođenja:</strong> ${safeBirthTime || 'Nije navedeno'}</li>
+          <li><strong>Mesto rođenja:</strong> ${safeBirthPlace}</li>
+          ${note ? `<li><strong>Napomena:</strong> ${safeNote}</li>` : ''}
         </ul>
         <p>Posetite dashboard za više detalja.</p>
       `,
@@ -1112,6 +1118,46 @@ const escapeHtml = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const formatBirthDateForEmail = (birthDate, language) => {
+  if (!birthDate) return '';
+  let year;
+  let month;
+  let day;
+
+  if (birthDate instanceof Date && !Number.isNaN(birthDate.valueOf())) {
+    year = birthDate.getUTCFullYear();
+    month = birthDate.getUTCMonth() + 1;
+    day = birthDate.getUTCDate();
+  } else if (typeof birthDate === 'string') {
+    const trimmed = birthDate.trim();
+    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      year = Number(match[1]);
+      month = Number(match[2]);
+      day = Number(match[3]);
+    } else {
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.valueOf())) {
+        year = parsed.getUTCFullYear();
+        month = parsed.getUTCMonth() + 1;
+        day = parsed.getUTCDate();
+      }
+    }
+  }
+
+  if (!year || !month || !day) return String(birthDate);
+
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  const locale = getDateLocale(language);
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(utcDate);
+};
+
 const formatOrderTemplate = (template, values) =>
   String(template || '').replace(/\{(\w+)\}/g, (_match, key) => escapeHtml(values?.[key] ?? ''));
 
@@ -1506,6 +1552,8 @@ Return ONLY a JSON object with keys "work", "health", and "love".
 Each value must contain 3 paragraphs separated by a blank line. Each paragraph should be 2-3 sentences.
 Each paragraph must include one concrete scenario and one actionable suggestion.
 Write in second person, warm, specific, and grounded in everyday details.
+Base the horoscope on the daily context above and rewrite it fully in your own words. Do not quote or mention sources.
+Ensure the wording is fresh and different each day; do not reuse or repeat sentences across sections.
 Do not mention any zodiac sign names, the ascendant, or the moon sign. Avoid lists and emojis.`
     : `
 You are an astrologer. Write a daily horoscope for ${signLabel} for ${dateLabel} in ${languageLabel}.
@@ -1514,6 +1562,8 @@ ${genderLine}
 Return ONLY a JSON object with keys "work", "health", and "love".
 Each value should be a short paragraph of 1-2 sentences, warm, specific, and written in second person.
 Include one concrete scenario and one actionable suggestion in each section.
+Base the horoscope on the daily context above and rewrite it fully in your own words. Do not quote or mention sources.
+Ensure the wording is fresh and different each day; do not reuse or repeat sentences across sections.
 Do not mention any zodiac sign names and avoid lists or emojis.`;
 
   try {
