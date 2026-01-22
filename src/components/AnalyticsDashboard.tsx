@@ -26,18 +26,18 @@ import { getAnalyticsSummary, type AnalyticsSummary } from '@/lib/api';
 type RangeFilter = '7d' | '30d' | '90d' | '365d';
 
 const buildRange = (range: RangeFilter) => {
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const start = new Date(end);
 
   if (range === '7d') {
-    start.setDate(start.getDate() - 6);
+    start.setUTCDate(start.getUTCDate() - 6);
   } else if (range === '30d') {
-    start.setDate(start.getDate() - 29);
+    start.setUTCDate(start.getUTCDate() - 29);
   } else if (range === '90d') {
-    start.setDate(start.getDate() - 89);
+    start.setUTCDate(start.getUTCDate() - 89);
   } else {
-    start.setDate(start.getDate() - 364);
+    start.setUTCDate(start.getUTCDate() - 364);
   }
 
   const toIso = (date: Date) => date.toISOString().slice(0, 10);
