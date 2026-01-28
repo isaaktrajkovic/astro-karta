@@ -5,6 +5,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import heroImage from '@/assets/hero-zodiac.jpg';
 import reportImage from '@/assets/astro-report.jpg';
 import consultationImage from '@/assets/consultation.jpg';
+import renderLogo from '@/assets/partners/render.png';
+import hostingerLogo from '@/assets/partners/hostinger.png';
+import miaiLogo from '@/assets/partners/miaisolutions.png';
 
 const Index = () => {
   const { t } = useLanguage();
@@ -53,6 +56,14 @@ const Index = () => {
       description: t('how.step3.desc'),
     },
   ];
+
+  const partners = [
+    { name: 'Render', logo: renderLogo, href: 'https://render.com/' },
+    { name: 'Hostinger', logo: hostingerLogo, href: 'https://www.hostinger.com/' },
+    { name: 'MIAI Solutions', logo: miaiLogo, href: 'https://miaisolutions.com/' },
+  ];
+
+  const marqueePartners = [...partners, ...partners];
 
   return (
     <div className="min-h-screen">
@@ -189,6 +200,38 @@ const Index = () => {
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Partners Marquee */}
+      <section className="py-10">
+        <div className="container mx-auto px-4">
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-card/60">
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-background to-transparent" />
+            <div className="flex items-center gap-12 py-6 marquee-track">
+              {marqueePartners.map((partner, index) => {
+                const isDuplicate = index >= partners.length;
+                return (
+                <div
+                  key={`${partner.name}-${index}`}
+                  className="flex items-center justify-center rounded-full border border-border/60 bg-background/40 px-6 py-3"
+                >
+                  <a
+                    href={partner.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={partner.name}
+                    tabIndex={isDuplicate ? -1 : 0}
+                    className="flex items-center justify-center transition-transform duration-300 hover:scale-105"
+                  >
+                    <img src={partner.logo} alt={partner.name} className="h-8 w-8 opacity-80" />
+                  </a>
+                </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>

@@ -55,7 +55,7 @@ const Contact = () => {
                 <h3 className="font-semibold text-foreground mb-1">
                   {language === 'sr' ? 'Telefon' : 'Phone'}
                 </h3>
-                <p className="text-muted-foreground">+381 11 123 4567</p>
+                <p className="text-muted-foreground">+32 477 37 88 89</p>
               </div>
             </div>
 
@@ -67,7 +67,9 @@ const Contact = () => {
                 <h3 className="font-semibold text-foreground mb-1">
                   {language === 'sr' ? 'Lokacija' : 'Location'}
                 </h3>
-                <p className="text-muted-foreground">Beograd, Srbija</p>
+                <p className="text-muted-foreground">
+                  5830 E 2nd St, Ste 7000 #21238, Casper, Wyoming 82609, United States
+                </p>
               </div>
             </div>
           </div>
