@@ -213,6 +213,7 @@ const Index = () => {
             <div className="flex items-center gap-12 py-6 marquee-track">
               {marqueePartners.map((partner, index) => {
                 const isDuplicate = index >= partners.length;
+                const isMiai = partner.name === 'MIAI Solutions';
                 return (
                 <div
                   key={`${partner.name}-${index}`}
@@ -226,7 +227,11 @@ const Index = () => {
                     tabIndex={isDuplicate ? -1 : 0}
                     className="flex items-center justify-center transition-transform duration-300 hover:scale-105"
                   >
-                    <img src={partner.logo} alt={partner.name} className="h-8 w-8 opacity-80" />
+                    <img
+                      src={partner.logo}
+                      alt={partner.name}
+                      className={`h-8 ${isMiai ? 'w-24' : 'w-8'} object-contain opacity-80`}
+                    />
                   </a>
                 </div>
                 );
