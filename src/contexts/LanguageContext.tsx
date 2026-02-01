@@ -405,20 +405,20 @@ export const translations: Translations = {
     ru: 'Приоритетный ответ в течение часа' 
   },
   'consult.live.title': { 
-    sr: 'Live konsultacija', 
-    en: 'Live Consultation', 
-    fr: 'Consultation en direct', 
-    de: 'Live-Beratung', 
-    es: 'Consulta en vivo', 
-    ru: 'Живая консультация' 
+    sr: 'Poziv sa astrologom (15 min)', 
+    en: 'Astrologer Call (15 min)', 
+    fr: 'Astrologer Call (15 min)', 
+    de: 'Astrologer Call (15 min)', 
+    es: 'Astrologer Call (15 min)', 
+    ru: 'Astrologer Call (15 min)' 
   },
   'consult.live.desc': { 
-    sr: '15-minutna video konsultacija uživo', 
-    en: '15-minute live video consultation', 
-    fr: 'Consultation vidéo en direct de 15 minutes', 
-    de: '15-minütige Live-Videoberatung', 
-    es: 'Consulta de video en vivo de 15 minutos', 
-    ru: '15-минутная видео-консультация в прямом эфире' 
+    sr: '15-minutni poziv sa astrologom', 
+    en: '15-minute call with an astrologer', 
+    fr: '15-minute call with an astrologer', 
+    de: '15-minute call with an astrologer', 
+    es: '15-minute call with an astrologer', 
+    ru: '15-minute call with an astrologer' 
   },
   'consult.note': { 
     sr: 'Svi odgovori se zasnivaju na natalnoj karti i aktuelnim tranzitima', 

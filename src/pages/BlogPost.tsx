@@ -12,9 +12,9 @@ const productData: Record<string, { titleSr: string; titleEn: string; priceCents
   'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
   'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
   'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },
-  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 600 },
-  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', priceCents: 1200 },
-  'consult-live': { titleSr: 'Live konsultacija', titleEn: 'Live Consultation', priceCents: 1500 },
+  'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 10000 },
+  'consult-vip': { titleSr: 'VIP odgovor (1h)', titleEn: 'VIP Answer (1h)', priceCents: 15000 },
+  'consult-live': { titleSr: 'Poziv sa astrologom (15 min)', titleEn: 'Astrologer Call (15 min)', priceCents: 9900 },
 };
 
 interface BlogPostData {
