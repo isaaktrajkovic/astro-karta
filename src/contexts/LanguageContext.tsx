@@ -997,6 +997,16 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         const response = await fetch('https://ipapi.co/json/');
         const data = await response.json();
         const countryCode = data.country_code;
+        const countryName = data.country_name;
+
+        if (typeof window !== 'undefined') {
+          if (countryCode) {
+            window.localStorage.setItem('astro_country_code', String(countryCode));
+          }
+          if (countryName) {
+            window.localStorage.setItem('astro_country', String(countryName));
+          }
+        }
         
         if (countryCode && countryToLanguage[countryCode]) {
           setLanguage(countryToLanguage[countryCode]);

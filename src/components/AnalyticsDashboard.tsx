@@ -108,6 +108,7 @@ const AnalyticsDashboard = ({ active }: AnalyticsDashboardProps) => {
   const topPages = summary?.top_pages || [];
   const topReferrers = summary?.top_referrers || [];
   const topProducts = summary?.top_products || [];
+  const topCountries = summary?.top_countries || [];
   const options = summary?.options;
 
   return (
@@ -307,7 +308,7 @@ const AnalyticsDashboard = ({ active }: AnalyticsDashboardProps) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-sm font-medium text-foreground mb-3">
             {language === 'sr' ? 'Najposecenije stranice' : 'Top pages'}
@@ -341,6 +342,26 @@ const AnalyticsDashboard = ({ active }: AnalyticsDashboardProps) => {
               {topReferrers.map((row) => (
                 <div key={row.referrer} className="flex items-center justify-between">
                   <span className="text-muted-foreground truncate pr-2">{row.referrer}</span>
+                  <span className="font-semibold text-foreground">{row.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-sm font-medium text-foreground mb-3">
+            {language === 'sr' ? 'Države posetilaca' : 'Top countries'}
+          </div>
+          {topCountries.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              {language === 'sr' ? 'Nema podataka' : 'No data'}
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm">
+              {topCountries.map((row) => (
+                <div key={row.country} className="flex items-center justify-between">
+                  <span className="text-muted-foreground truncate pr-2">{row.country}</span>
                   <span className="font-semibold text-foreground">{row.count}</span>
                 </div>
               ))}

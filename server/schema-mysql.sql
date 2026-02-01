@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   order_id INT NULL,
   value_cents INT NULL,
   currency VARCHAR(16) NULL,
+  country VARCHAR(255) NULL,
   session_id VARCHAR(255) NULL,
   user_agent VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -166,3 +167,4 @@ CREATE INDEX analytics_events_referral_idx ON analytics_events (referral_code);
 CREATE INDEX analytics_events_path_idx ON analytics_events (path);
 CREATE INDEX analytics_events_referrer_idx ON analytics_events (referrer_host);
 CREATE INDEX analytics_events_product_idx ON analytics_events (product_id);
+CREATE INDEX analytics_events_country_idx ON analytics_events (country);

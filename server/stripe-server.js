@@ -897,6 +897,7 @@ const logOrderCreatedEvent = async (orderId, payload, pricing) => {
     utm_content: payload.utm_content,
     referrer: payload.referrer,
     path: payload.landing_path,
+    country: payload.country,
     session_id: payload.session_id,
   });
 };
@@ -917,6 +918,7 @@ const logCheckoutStartedEvent = async (orderId, payload, pricing) => {
     utm_content: payload.utm_content,
     referrer: payload.referrer,
     path: payload.landing_path,
+    country: payload.country,
     session_id: payload.session_id,
   });
 };
@@ -937,6 +939,7 @@ const logOrderCompletedEvent = async (order) => {
     utm_content: order.utm_content,
     referrer: order.referrer,
     path: order.landing_path,
+    country: order.country,
     session_id: order.session_id,
   });
 };
@@ -1273,6 +1276,7 @@ const buildAnalyticsEvent = (payload = {}) => {
     order_id: Number.isInteger(Number(payload.order_id)) ? Number(payload.order_id) : null,
     value_cents: normalizeAnalyticsCents(payload.value_cents),
     currency: normalizeAnalyticsValue(payload.currency, 12),
+    country: normalizeAnalyticsValue(payload.country, 120),
     session_id: normalizeAnalyticsValue(payload.session_id, 120),
     user_agent: normalizeAnalyticsValue(payload.user_agent, 240),
   };
@@ -1300,9 +1304,10 @@ const logAnalyticsEvent = async (payload) => {
         order_id,
         value_cents,
         currency,
+        country,
         session_id,
         user_agent
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
       [
         event.event_type,
         event.path,
@@ -1318,6 +1323,7 @@ const logAnalyticsEvent = async (payload) => {
         event.order_id,
         event.value_cents,
         event.currency,
+        event.country,
         event.session_id,
         event.user_agent,
       ]
@@ -2549,6 +2555,16 @@ app.get('/api/analytics/summary', requireAuth, async (req, res) => {
       values
     );
 
+    const { rows: countryRows } = await pool.query(
+      `SELECT country, COUNT(*)::int AS count
+       FROM analytics_events
+       WHERE ${where} AND event_type = 'page_view' AND country IS NOT NULL
+       GROUP BY country
+       ORDER BY count DESC
+       LIMIT 10`,
+      values
+    );
+
     const { rows: productRows } = await pool.query(
       `SELECT
         product_id,
@@ -2604,6 +2620,7 @@ app.get('/api/analytics/summary', requireAuth, async (req, res) => {
       daily: dailyRows || [],
       top_pages: pageRows || [],
       top_referrers: referrerRows || [],
+      top_countries: countryRows || [],
       top_products: productRows || [],
       options: {
         utm_sources: sourceRows.map((row) => row.utm_source),

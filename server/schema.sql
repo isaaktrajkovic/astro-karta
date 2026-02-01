@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   order_id INT NULL,
   value_cents INT NULL,
   currency TEXT NULL,
+  country TEXT NULL,
   session_id TEXT NULL,
   user_agent TEXT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -193,3 +194,6 @@ CREATE INDEX IF NOT EXISTS analytics_events_referrer_idx
 
 CREATE INDEX IF NOT EXISTS analytics_events_product_idx
   ON analytics_events (product_id);
+
+CREATE INDEX IF NOT EXISTS analytics_events_country_idx
+  ON analytics_events (country);

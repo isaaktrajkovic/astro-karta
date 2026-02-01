@@ -183,6 +183,7 @@ export interface AnalyticsSummary {
   }>;
   top_pages: Array<{ path: string; count: number }>;
   top_referrers: Array<{ referrer: string; count: number }>;
+  top_countries: Array<{ country: string; count: number }>;
   top_products: Array<{
     product_id: string;
     order_created: number;

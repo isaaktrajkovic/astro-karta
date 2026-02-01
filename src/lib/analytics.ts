@@ -1,6 +1,10 @@
 const apiBase = import.meta.env.VITE_API_BASE_URL || '';
 const sessionKey = 'astro_session_id';
 const attributionKey = 'astro_attribution';
+const countryKey = 'astro_country';
+const countryCodeKey = 'astro_country_code';
+
+let countryPromise: Promise<string | null> | null = null;
 
 type Attribution = {
   utm_source?: string;
@@ -27,6 +31,39 @@ const normalizeValue = (value?: string | null) => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const fetchCountry = async (): Promise<string | null> => {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) return null;
+    const data = await res.json();
+    const countryName = typeof data?.country_name === 'string' ? data.country_name.trim() : '';
+    const countryCode = typeof data?.country_code === 'string' ? data.country_code.trim() : '';
+    if (typeof window !== 'undefined') {
+      if (countryCode) {
+        window.localStorage.setItem(countryCodeKey, countryCode);
+      }
+      if (countryName) {
+        window.localStorage.setItem(countryKey, countryName);
+      }
+    }
+    return countryName || countryCode || null;
+  } catch {
+    return null;
+  }
+};
+
+const getCountry = async (): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  const storedName = window.localStorage.getItem(countryKey);
+  if (storedName) return storedName;
+  const storedCode = window.localStorage.getItem(countryCodeKey);
+  if (storedCode) return storedCode;
+  if (!countryPromise) {
+    countryPromise = fetchCountry();
+  }
+  return countryPromise;
 };
 
 export const getSessionId = () => {
@@ -93,7 +130,11 @@ const buildPayload = (event_type: string, payload: Record<string, unknown> = {})
 
 export const trackEvent = async (event_type: string, payload?: Record<string, unknown>) => {
   if (!apiBase) return;
-  const body = buildPayload(event_type, payload);
+  const country = await getCountry();
+  const body = buildPayload(event_type, {
+    ...(country ? { country } : {}),
+    ...payload,
+  });
   try {
     await fetch(`${apiBase}/api/analytics/event`, {
       method: 'POST',
