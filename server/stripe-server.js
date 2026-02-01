@@ -635,12 +635,9 @@ const sendManualReportEmail = async ({
   });
 };
 
-const horoscopeSubscriptionPlans = new Map([
-  ['monthly-basic', 'basic'],
-]);
+const horoscopeSubscriptionPlans = new Map();
 
 const productPriceCentsById = new Map([
-  ['monthly-basic', 0],
   ['report-natal', 11000],
   ['report-yearly', 7000],
   ['report-solar', 9000],
@@ -648,9 +645,9 @@ const productPriceCentsById = new Map([
   ['report-questions', 3500],
   ['report-love', 1000],
   ['report-career', 1200],
-  ['consult-email', 600],
-  ['consult-vip', 1200],
-  ['consult-live', 1500],
+  ['consult-email', 10000],
+  ['consult-vip', 15000],
+  ['consult-live', 9900],
   ['physical-talisman', 3000],
   ['physical-crystal', 4000],
 ]);
