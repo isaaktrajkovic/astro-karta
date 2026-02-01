@@ -7,17 +7,6 @@ import consultationImage from '@/assets/consultation.jpg';
 const Products = () => {
   const { t } = useLanguage();
 
-  const monthlyPackages = [
-    {
-      id: 'monthly-basic',
-      title: t('monthly.basic.title'),
-      description: t('monthly.basic.desc'),
-      priceCents: 0,
-      image: reportImage,
-      badge: t('monthly.perMonth'),
-    },
-  ];
-
   const reports = [
     {
       id: 'report-natal',
@@ -100,18 +89,6 @@ const Products = () => {
 
         {/* Compatibility Calculator */}
         <CompatibilityCalculator />
-
-        {/* Monthly Packages */}
-        <section id="monthly" className="mb-20 scroll-mt-24">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-foreground">
-            {t('products.monthly')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {monthlyPackages.map((product) => (
-              <ProductCard key={product.id} {...product} />
-            ))}
-          </div>
-        </section>
 
         {/* Reports */}
         <section id="reports" className="mb-20 scroll-mt-24">

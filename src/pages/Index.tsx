@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, FileText, MessageCircle, Calendar, Star, Heart } from 'lucide-react';
+import { ArrowRight, Sparkles, FileText, MessageCircle, Star, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import heroImage from '@/assets/hero-zodiac.jpg';
@@ -13,14 +13,6 @@ const Index = () => {
   const { t } = useLanguage();
 
   const productGroups = [
-    {
-      id: 'monthly',
-      title: t('products.monthly'),
-      description: t('products.monthly.desc'),
-      icon: Calendar,
-      image: reportImage,
-      color: 'from-primary to-primary/50',
-    },
     {
       id: 'reports',
       title: t('products.reports'),
