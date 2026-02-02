@@ -638,11 +638,13 @@ const sendManualReportEmail = async ({
 const horoscopeSubscriptionPlans = new Map();
 
 const productPriceCentsById = new Map([
-  ['report-natal', 11000],
-  ['report-yearly', 7000],
-  ['report-solar', 9000],
-  ['report-synastry', 15000],
-  ['report-questions', 3500],
+  ['partner-description', 600],
+  ['partner-description-when', 800],
+  ['report-natal', 8000],
+  ['report-yearly', 5000],
+  ['report-solar', 6000],
+  ['report-synastry', 8000],
+  ['report-questions', 2000],
   ['report-love', 1000],
   ['report-career', 1200],
   ['consult-email', 10000],
@@ -655,6 +657,29 @@ const productPriceCentsById = new Map([
 const getProductPriceCents = (productId) => {
   const price = productPriceCentsById.get(productId);
   return Number.isFinite(price) ? price : 0;
+};
+
+const productNamesById = new Map([
+  ['partner-description', { sr: 'Opis vašeg budućeg partnera', en: 'Future Partner Description' }],
+  ['partner-description-when', { sr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati', en: 'Future Partner + When You’ll Meet' }],
+  ['report-natal', { sr: 'Analiza natalne karte', en: 'Natal Chart Analysis' }],
+  ['report-yearly', { sr: 'Godišnji astro izveštaj', en: 'Annual Astro Report' }],
+  ['report-solar', { sr: 'Solarni horoskop', en: 'Solar Return Horoscope' }],
+  ['report-synastry', { sr: 'Uporedni horoskop i Sinastrija', en: 'Relationship Horoscope & Synastry' }],
+  ['report-questions', { sr: 'Pojedinačna Astro pitanja', en: 'Single Astro Questions' }],
+  ['report-love', { sr: 'Ljubavna analiza', en: 'Love Analysis' }],
+  ['report-career', { sr: 'Finansijski izveštaj', en: 'Financial Report' }],
+  ['consult-email', { sr: 'Astro-odgovor (24h)', en: 'Astro Answer (24h)' }],
+  ['consult-vip', { sr: 'VIP odgovor (1h)', en: 'VIP Answer (1h)' }],
+  ['consult-live', { sr: 'Poziv sa astrologom (15 min)', en: 'Astrologer Call (15 min)' }],
+  ['physical-talisman', { sr: 'Talisman set', en: 'Talisman set' }],
+  ['physical-crystal', { sr: 'Crystal set', en: 'Crystal set' }],
+]);
+
+const getProductName = (productId, language) => {
+  const entry = productNamesById.get(productId);
+  if (!entry) return null;
+  return entry[language] || entry.sr || entry.en || null;
 };
 
 const clampPercent = (value) => {
@@ -705,9 +730,10 @@ const buildOrderPayload = (body) => {
   const normalizedLandingPath = normalizeAnalyticsValue(landing_path, 400);
   const normalizedSessionId = normalizeAnalyticsValue(session_id, 120);
 
+  const normalizedProductName = getProductName(product_id, normalizedLanguage);
   if (
     !product_id ||
-    !product_name ||
+    !normalizedProductName ||
     !normalizedCustomerName ||
     !first_name ||
     !last_name ||
@@ -724,7 +750,7 @@ const buildOrderPayload = (body) => {
   return {
     data: {
       product_id,
-      product_name,
+      product_name: normalizedProductName,
       customer_name: normalizedCustomerName,
       first_name,
       last_name,

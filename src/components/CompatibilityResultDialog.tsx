@@ -65,7 +65,7 @@ const CompatibilityResultDialog = ({
   const [showProgress, setShowProgress] = useState(0);
   const [showUpsell, setShowUpsell] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
-  const priceCents = 15000;
+  const priceCents = 8000;
   const [loadingDots, setLoadingDots] = useState(0);
 
   useEffect(() => {

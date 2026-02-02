@@ -7,45 +7,66 @@ import consultationImage from '@/assets/consultation.jpg';
 const Products = () => {
   const { t } = useLanguage();
 
+  const featured = [
+    {
+      id: 'partner-description',
+      title: t('featured.partner.basic.title'),
+      description: t('featured.partner.basic.desc'),
+      priceCents: 600,
+      originalPriceCents: 900,
+      image: reportImage,
+      badge: 'Novo',
+    },
+    {
+      id: 'partner-description-when',
+      title: t('featured.partner.when.title'),
+      description: t('featured.partner.when.desc'),
+      priceCents: 800,
+      originalPriceCents: 1200,
+      image: reportImage,
+      badge: 'Novo',
+    },
+  ];
+
   const reports = [
     {
       id: 'report-natal',
       title: t('reports.natal.title'),
       description: t('reports.natal.desc'),
-      priceCents: 11000,
-      originalPriceCents: 15000,
+      priceCents: 8000,
+      originalPriceCents: 10000,
       image: reportImage,
     },
     {
       id: 'report-yearly',
       title: t('reports.yearly.title'),
       description: t('reports.yearly.desc'),
-      priceCents: 7000,
-      originalPriceCents: 9500,
+      priceCents: 5000,
+      originalPriceCents: 7500,
       image: reportImage,
     },
     {
       id: 'report-solar',
       title: t('reports.solar.title'),
       description: t('reports.solar.desc'),
-      priceCents: 9000,
-      originalPriceCents: 12000,
+      priceCents: 6000,
+      originalPriceCents: 9000,
       image: reportImage,
     },
     {
       id: 'report-synastry',
       title: t('reports.synastry.title'),
       description: t('reports.synastry.desc'),
-      priceCents: 15000,
-      originalPriceCents: 22000,
+      priceCents: 8000,
+      originalPriceCents: 15000,
       image: reportImage,
     },
     {
       id: 'report-questions',
       title: t('reports.questions.title'),
       description: t('reports.questions.desc'),
-      priceCents: 3500,
-      originalPriceCents: 5500,
+      priceCents: 2000,
+      originalPriceCents: 3500,
       image: reportImage,
     },
   ];
@@ -89,6 +110,18 @@ const Products = () => {
 
         {/* Compatibility Calculator */}
         <CompatibilityCalculator />
+
+        {/* Featured */}
+        <section id="featured" className="mb-20 scroll-mt-24">
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">
+            {t('products.featured')}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featured.map((product) => (
+              <ProductCard key={product.id} {...product} />
+            ))}
+          </div>
+        </section>
 
         {/* Reports */}
         <section id="reports" className="mb-20 scroll-mt-24">

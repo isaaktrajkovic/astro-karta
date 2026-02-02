@@ -8,7 +8,13 @@ import { BlogAsset, BlogPost as ApiBlogPost, getBlogPost } from '@/lib/api';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
-  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 7000 },
+  'partner-description': { titleSr: 'Opis vašeg budućeg partnera', titleEn: 'Future Partner Description', priceCents: 600 },
+  'partner-description-when': { titleSr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati', titleEn: 'Future Partner + When You’ll Meet', priceCents: 800 },
+  'report-natal': { titleSr: 'Analiza natalne karte', titleEn: 'Natal Chart Analysis', priceCents: 8000 },
+  'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 5000 },
+  'report-solar': { titleSr: 'Solarni horoskop', titleEn: 'Solar Return Horoscope', priceCents: 6000 },
+  'report-synastry': { titleSr: 'Uporedni horoskop i Sinastrija', titleEn: 'Relationship Horoscope & Synastry', priceCents: 8000 },
+  'report-questions': { titleSr: 'Pojedinačna Astro pitanja', titleEn: 'Single Astro Questions', priceCents: 2000 },
   'report-love': { titleSr: 'Ljubavna analiza', titleEn: 'Love Analysis', priceCents: 1000 },
   'report-career': { titleSr: 'Finansijski izveštaj', titleEn: 'Financial Report', priceCents: 1200 },
   'consult-email': { titleSr: 'Astro-odgovor (24h)', titleEn: 'Astro Answer (24h)', priceCents: 10000 },

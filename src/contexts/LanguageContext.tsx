@@ -174,6 +174,14 @@ export const translations: Translations = {
     es: 'Consultas rápidas', 
     ru: 'Быстрые консультации' 
   },
+  'products.featured': {
+    sr: 'Izdvojene usluge',
+    en: 'Featured Services',
+    fr: 'Featured Services',
+    de: 'Featured Services',
+    es: 'Featured Services',
+    ru: 'Featured Services'
+  },
   'products.physical': { 
     sr: 'Fizički setovi', 
     en: 'Physical Sets', 
@@ -237,6 +245,40 @@ export const translations: Translations = {
     de: 'Kristalle, Kerzen und rituelle Sets', 
     es: 'Cristales, velas y sets rituales', 
     ru: 'Кристаллы, свечи и ритуальные наборы' 
+  },
+
+  // Featured partner services
+  'featured.partner.basic.title': {
+    sr: 'Opis vašeg budućeg partnera',
+    en: 'Future Partner Description',
+    fr: 'Future Partner Description',
+    de: 'Future Partner Description',
+    es: 'Future Partner Description',
+    ru: 'Future Partner Description'
+  },
+  'featured.partner.basic.desc': {
+    sr: 'Kratak astro uvid u osobine i energiju budućeg partnera.',
+    en: 'A short astro insight into the qualities and energy of your future partner.',
+    fr: 'A short astro insight into the qualities and energy of your future partner.',
+    de: 'A short astro insight into the qualities and energy of your future partner.',
+    es: 'A short astro insight into the qualities and energy of your future partner.',
+    ru: 'A short astro insight into the qualities and energy of your future partner.'
+  },
+  'featured.partner.when.title': {
+    sr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati',
+    en: 'Future Partner + When You’ll Meet',
+    fr: 'Future Partner + When You’ll Meet',
+    de: 'Future Partner + When You’ll Meet',
+    es: 'Future Partner + When You’ll Meet',
+    ru: 'Future Partner + When You’ll Meet'
+  },
+  'featured.partner.when.desc': {
+    sr: 'Uvid u osobine partnera i period kada je moguće upoznavanje.',
+    en: 'Insight into partner traits and the likely period of meeting.',
+    fr: 'Insight into partner traits and the likely period of meeting.',
+    de: 'Insight into partner traits and the likely period of meeting.',
+    es: 'Insight into partner traits and the likely period of meeting.',
+    ru: 'Insight into partner traits and the likely period of meeting.'
   },
 
   // Monthly packages
