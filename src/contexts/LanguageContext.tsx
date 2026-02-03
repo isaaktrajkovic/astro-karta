@@ -265,7 +265,7 @@ export const translations: Translations = {
     ru: 'A short astro insight into the qualities and energy of your future partner.'
   },
   'featured.partner.when.title': {
-    sr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati',
+    sr: 'Opis vašeg budućeg partnera i gde ćete ga upoznati',
     en: 'Future Partner + When You’ll Meet',
     fr: 'Future Partner + When You’ll Meet',
     de: 'Future Partner + When You’ll Meet',

@@ -661,7 +661,7 @@ const getProductPriceCents = (productId) => {
 
 const productNamesById = new Map([
   ['partner-description', { sr: 'Opis vašeg budućeg partnera', en: 'Future Partner Description' }],
-  ['partner-description-when', { sr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati', en: 'Future Partner + When You’ll Meet' }],
+  ['partner-description-when', { sr: 'Opis vašeg budućeg partnera i gde ćete ga upoznati', en: 'Future Partner + When You’ll Meet' }],
   ['report-natal', { sr: 'Analiza natalne karte', en: 'Natal Chart Analysis' }],
   ['report-yearly', { sr: 'Godišnji astro izveštaj', en: 'Annual Astro Report' }],
   ['report-solar', { sr: 'Solarni horoskop', en: 'Solar Return Horoscope' }],
@@ -2392,6 +2392,7 @@ const buildAnalyticsWhere = (filters) => {
   add('utm_campaign', filters.utm_campaign);
   add('referral_code', filters.referral_code);
   add('product_id', filters.product_id);
+  clauses.push(`(path IS NULL OR (path NOT ILIKE '/dashboard%' AND path NOT ILIKE '/auth%'))`);
 
   return { where: clauses.join(' AND '), values };
 };

@@ -32,7 +32,11 @@ const AnalyticsTracker = () => {
   const location = useLocation();
 
   useEffect(() => {
-    trackPageView(`${location.pathname}${location.search}`);
+    const isAdminRoute = location.pathname.startsWith('/dashboard')
+      || location.pathname.startsWith('/auth');
+    if (!isAdminRoute) {
+      trackPageView(`${location.pathname}${location.search}`);
+    }
   }, [location.pathname, location.search]);
 
   return null;

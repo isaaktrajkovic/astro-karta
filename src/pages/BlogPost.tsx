@@ -9,7 +9,7 @@ import heroImage from '@/assets/hero-zodiac.jpg';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
   'partner-description': { titleSr: 'Opis vašeg budućeg partnera', titleEn: 'Future Partner Description', priceCents: 600 },
-  'partner-description-when': { titleSr: 'Opis vašeg budućeg partnera i kada ćete ga upoznati', titleEn: 'Future Partner + When You’ll Meet', priceCents: 800 },
+  'partner-description-when': { titleSr: 'Opis vašeg budućeg partnera i gde ćete ga upoznati', titleEn: 'Future Partner + When You’ll Meet', priceCents: 800 },
   'report-natal': { titleSr: 'Analiza natalne karte', titleEn: 'Natal Chart Analysis', priceCents: 8000 },
   'report-yearly': { titleSr: 'Godišnji astro izveštaj', titleEn: 'Annual Astro Report', priceCents: 5000 },
   'report-solar': { titleSr: 'Solarni horoskop', titleEn: 'Solar Return Horoscope', priceCents: 6000 },
