@@ -359,6 +359,59 @@ const BlogPost = () => {
     return parts;
   };
 
+  const renderInlineContent = (text: string) => {
+    const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|www\.[^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*/;
+    const parts: ReactNode[] = [];
+    let remaining = text;
+    let index = 0;
+
+    while (true) {
+      const match = pattern.exec(remaining);
+      if (!match) {
+        parts.push(...linkifyText(remaining));
+        break;
+      }
+
+      const [fullMatch, linkText, linkUrl, boldText, italicText] = match;
+      const start = match.index;
+      if (start > 0) {
+        parts.push(...linkifyText(remaining.slice(0, start)));
+      }
+
+      if (linkText && linkUrl) {
+        const href = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+        parts.push(
+          <a
+            key={`inline-link-${index}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline underline-offset-4"
+          >
+            {linkText}
+          </a>
+        );
+      } else if (boldText) {
+        parts.push(
+          <strong key={`inline-bold-${index}`} className="text-foreground font-semibold">
+            {boldText}
+          </strong>
+        );
+      } else if (italicText) {
+        parts.push(
+          <em key={`inline-italic-${index}`} className="text-foreground/90 italic">
+            {italicText}
+          </em>
+        );
+      }
+
+      remaining = remaining.slice(start + fullMatch.length);
+      index += 1;
+    }
+
+    return parts;
+  };
+
   const renderDynamicContent = (content: string, images: BlogAsset[]) => {
     const paragraphs = content.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
     const imageGrid = images.length ? (
@@ -383,7 +436,7 @@ const BlogPost = () => {
         {paragraphs.map((paragraph, index) => (
           <div key={`${paragraph.slice(0, 12)}-${index}`} className="space-y-4">
             <p className="text-muted-foreground leading-relaxed">
-              {linkifyText(paragraph)}
+              {renderInlineContent(paragraph)}
             </p>
             {index === 0 && imageGrid}
           </div>

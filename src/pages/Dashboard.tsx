@@ -23,6 +23,9 @@ import {
   getReferralOrders,
   updateOrderReferralPaid,
   createBlogPost,
+  getBlogPosts,
+  deleteBlogPost,
+  BlogPost as ApiBlogPost,
   Referral as ApiReferral,
   ReferralOrder as ApiReferralOrder,
 } from '@/lib/api';
@@ -139,11 +142,15 @@ const Dashboard = () => {
   const [blogImages, setBlogImages] = useState<File[]>([]);
   const [blogAttachments, setBlogAttachments] = useState<File[]>([]);
   const [blogSaving, setBlogSaving] = useState(false);
+  const [blogPosts, setBlogPosts] = useState<ApiBlogPost[]>([]);
+  const [blogPostsLoading, setBlogPostsLoading] = useState(false);
+  const [blogDeletingId, setBlogDeletingId] = useState<number | null>(null);
   const referralFormRef = useRef<HTMLDivElement | null>(null);
   const referralCodeInputRef = useRef<HTMLInputElement | null>(null);
   const ordersSectionRef = useRef<HTMLDivElement | null>(null);
   const referralsSectionRef = useRef<HTMLDivElement | null>(null);
   const blogSectionRef = useRef<HTMLDivElement | null>(null);
+  const blogContentRef = useRef<HTMLTextAreaElement | null>(null);
   const analyticsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const fetchOrders = async () => {
@@ -189,6 +196,25 @@ const Dashboard = () => {
       });
     } finally {
       setReferralsLoading(false);
+    }
+  };
+
+  const fetchBlogPosts = async () => {
+    setBlogPostsLoading(true);
+    try {
+      const { posts } = await getBlogPosts();
+      setBlogPosts(posts || []);
+    } catch (error) {
+      console.error('Error fetching blog posts:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: language === 'sr'
+          ? 'Nije moguće učitati blog objave.'
+          : 'Could not load blog posts.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBlogPostsLoading(false);
     }
   };
 
@@ -349,6 +375,44 @@ const Dashboard = () => {
     setBlogAttachments((prev) => prev.filter((_, idx) => idx !== index));
   };
 
+  const wrapBlogContentSelection = (prefix: string, suffix = prefix, placeholder = '') => {
+    const textarea = blogContentRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? blogContent.length;
+    const end = textarea.selectionEnd ?? blogContent.length;
+    const selected = blogContent.slice(start, end);
+    const content = selected || placeholder;
+    const next = `${blogContent.slice(0, start)}${prefix}${content}${suffix}${blogContent.slice(end)}`;
+    setBlogContent(next);
+
+    const selectionStart = start + prefix.length;
+    const selectionEnd = selectionStart + content.length;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
+  const handleInsertBlogLink = () => {
+    const textarea = blogContentRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? blogContent.length;
+    const end = textarea.selectionEnd ?? blogContent.length;
+    const selected = blogContent.slice(start, end).trim();
+    const text = selected || window.prompt(language === 'sr' ? 'Tekst linka' : 'Link text', selected || '') || '';
+    if (!text) return;
+    const url = window.prompt(language === 'sr' ? 'URL' : 'URL', 'https://') || '';
+    if (!url) return;
+    const linkMarkup = `[${text}](${url})`;
+    const next = `${blogContent.slice(0, start)}${linkMarkup}${blogContent.slice(end)}`;
+    setBlogContent(next);
+    const cursorPos = start + linkMarkup.length;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursorPos, cursorPos);
+    });
+  };
+
   const handleCreateBlogPost = async () => {
     const title = blogTitle.trim();
     const content = blogContent.trim();
@@ -381,6 +445,7 @@ const Dashboard = () => {
           : 'Blog post has been published.',
       });
       resetBlogForm();
+      fetchBlogPosts();
     } catch (error) {
       console.error('Failed to create blog post:', error);
       toast({
@@ -394,6 +459,40 @@ const Dashboard = () => {
       });
     } finally {
       setBlogSaving(false);
+    }
+  };
+
+  const handleDeleteBlogPost = async (post: ApiBlogPost) => {
+    const confirmed = window.confirm(
+      language === 'sr'
+        ? `Da li ste sigurni da želite da obrišete objavu "${post.title}"?`
+        : `Are you sure you want to delete "${post.title}"?`
+    );
+    if (!confirmed) return;
+
+    setBlogDeletingId(post.id);
+    try {
+      await deleteBlogPost(post.id);
+      toast({
+        title: language === 'sr' ? 'Obrisano' : 'Deleted',
+        description: language === 'sr'
+          ? 'Blog post je obrisan.'
+          : 'Blog post has been deleted.',
+      });
+      fetchBlogPosts();
+    } catch (error) {
+      console.error('Failed to delete blog post:', error);
+      toast({
+        title: language === 'sr' ? 'Greška' : 'Error',
+        description: error instanceof Error
+          ? error.message
+          : (language === 'sr'
+            ? 'Brisanje nije uspelo.'
+            : 'Delete failed.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setBlogDeletingId(null);
     }
   };
 
@@ -847,6 +946,7 @@ const Dashboard = () => {
     fetchOrders();
     fetchCalculatorUsage();
     fetchReferrals();
+    fetchBlogPosts();
   }, []);
 
   useEffect(() => {
@@ -1184,6 +1284,7 @@ const Dashboard = () => {
     if (isOpening) {
       setBlogCollapsed(false);
       scrollToSection(blogSectionRef);
+      fetchBlogPosts();
     }
   };
 
@@ -2062,8 +2163,39 @@ const Dashboard = () => {
                   <Label htmlFor="blog-content">
                     {language === 'sr' ? 'Tekst objave' : 'Post content'}
                   </Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="px-3 font-semibold"
+                      onClick={() => wrapBlogContentSelection('**')}
+                    >
+                      B
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="px-3 italic"
+                      onClick={() => wrapBlogContentSelection('*')}
+                    >
+                      I
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="px-3"
+                      onClick={handleInsertBlogLink}
+                    >
+                      <Link2 className="w-4 h-4 mr-2" />
+                      {language === 'sr' ? 'Link' : 'Link'}
+                    </Button>
+                  </div>
                   <Textarea
                     id="blog-content"
+                    ref={blogContentRef}
                     value={blogContent}
                     onChange={(event) => setBlogContent(event.target.value)}
                     placeholder={language === 'sr'
@@ -2176,6 +2308,68 @@ const Dashboard = () => {
                 </li>
               </ul>
             </div>
+          </div>
+
+          <div className="mt-8 bg-card rounded-xl border border-border p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                {language === 'sr' ? 'Objave' : 'Posts'}
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={fetchBlogPosts}
+                disabled={blogPostsLoading}
+              >
+                {blogPostsLoading
+                  ? (language === 'sr' ? 'Učitavanje...' : 'Loading...')
+                  : (language === 'sr' ? 'Osveži' : 'Refresh')}
+              </Button>
+            </div>
+
+            {blogPostsLoading ? (
+              <div className="text-sm text-muted-foreground">
+                {language === 'sr' ? 'Učitavanje objava...' : 'Loading posts...'}
+              </div>
+            ) : blogPosts.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                {language === 'sr' ? 'Nema objava.' : 'No posts yet.'}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {blogPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/20 p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-semibold text-foreground">{post.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(post.published_at || post.created_at).toLocaleDateString(
+                          language === 'sr' ? 'sr-RS' : 'en-US',
+                          { year: 'numeric', month: 'long', day: 'numeric' }
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'sr' ? 'Slug' : 'Slug'}: {post.slug}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteBlogPost(post)}
+                      disabled={blogDeletingId === post.id}
+                    >
+                      {blogDeletingId === post.id
+                        ? (language === 'sr' ? 'Brisanje...' : 'Deleting...')
+                        : (language === 'sr' ? 'Obriši' : 'Delete')}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           )}
         </div>

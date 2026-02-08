@@ -1102,11 +1102,57 @@ const blogUpload = multer({
   { name: 'attachments', maxCount: 3 },
 ]);
 
-const buildBlogAsset = (file) => ({
-  url: `${normalizedApiBaseUrl}/uploads/blog/${file.filename}`,
+const getRequestBaseUrl = (req) => {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const proto = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : forwardedProto || req.protocol || 'https';
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const host = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost || req.headers.host;
+  if (host) return `${proto}://${host}`;
+  return normalizedApiBaseUrl;
+};
+
+const normalizeAssetList = (assets, baseUrl) =>
+  (assets || []).map((asset) => {
+    if (!asset || !asset.url) return asset;
+    const url = String(asset.url);
+    if (url.startsWith('/')) {
+      return { ...asset, url: `${baseUrl}${url}` };
+    }
+    if (/^https?:\/\/localhost(?::\d+)?\//i.test(url)) {
+      return { ...asset, url: url.replace(/^https?:\/\/localhost(?::\d+)?/i, baseUrl) };
+    }
+    return asset;
+  });
+
+const buildBlogAsset = (baseUrl, file) => ({
+  url: `${baseUrl}/uploads/blog/${file.filename}`,
   name: file.originalname,
   mime: file.mimetype,
 });
+
+const deleteBlogFiles = async (assets = []) => {
+  if (!assets.length) return;
+  const tasks = assets.map((asset) => {
+    const rawUrl = asset?.url;
+    if (!rawUrl) return null;
+    try {
+      const url = String(rawUrl);
+      const pathname = url.startsWith('http') ? new URL(url).pathname : url;
+      const marker = '/uploads/blog/';
+      const markerIndex = pathname.lastIndexOf(marker);
+      if (markerIndex === -1) return null;
+      const filename = path.basename(pathname.slice(markerIndex + marker.length));
+      if (!filename) return null;
+      const filePath = path.join(blogUploadsDir, filename);
+      return fs.promises.unlink(filePath).catch(() => null);
+    } catch {
+      return null;
+    }
+  });
+  await Promise.all(tasks.filter(Boolean));
+};
 
 const ensureUniqueBlogSlug = async (baseSlug) => {
   const normalizedBase = baseSlug || 'blog-post';
@@ -3277,18 +3323,19 @@ const handleBlogUpload = (req, res, next) => {
   });
 };
 
-const formatBlogRow = (row) => ({
+const formatBlogRow = (row, baseUrl) => ({
   ...row,
-  images: parseJsonArray(row.image_urls),
-  attachments: parseJsonArray(row.attachment_urls),
+  images: normalizeAssetList(parseJsonArray(row.image_urls), baseUrl),
+  attachments: normalizeAssetList(parseJsonArray(row.attachment_urls), baseUrl),
 });
 
-app.get('/api/blog', async (_req, res) => {
+app.get('/api/blog', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: 'Database not configured' });
   }
 
   try {
+    const requestBaseUrl = getRequestBaseUrl(req);
     const { rows } = await pool.query(
       `SELECT
         id,
@@ -3304,7 +3351,7 @@ app.get('/api/blog', async (_req, res) => {
       WHERE is_published = true
       ORDER BY published_at DESC`
     );
-    return res.json({ posts: rows.map(formatBlogRow) });
+    return res.json({ posts: rows.map((row) => formatBlogRow(row, requestBaseUrl)) });
   } catch (error) {
     console.error('Failed to fetch blog posts:', error);
     return res.status(500).json({ error: 'Failed to fetch blog posts' });
@@ -3342,7 +3389,8 @@ app.get('/api/blog/:slug', async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({ error: 'Blog post not found' });
     }
-    return res.json({ post: formatBlogRow(rows[0]) });
+    const requestBaseUrl = getRequestBaseUrl(req);
+    return res.json({ post: formatBlogRow(rows[0], requestBaseUrl) });
   } catch (error) {
     console.error('Failed to fetch blog post:', error);
     return res.status(500).json({ error: 'Failed to fetch blog post' });
@@ -3365,8 +3413,9 @@ app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
   try {
     const slugBase = normalizeBlogSlug(title) || 'blog-post';
     const slug = await ensureUniqueBlogSlug(slugBase);
-    const images = (req.files?.images || []).map(buildBlogAsset);
-    const attachments = (req.files?.attachments || []).map(buildBlogAsset);
+    const requestBaseUrl = getRequestBaseUrl(req);
+    const images = (req.files?.images || []).map((file) => buildBlogAsset(requestBaseUrl, file));
+    const attachments = (req.files?.attachments || []).map((file) => buildBlogAsset(requestBaseUrl, file));
     const excerpt = excerptInput || createExcerpt(content);
 
     const { rows } = await pool.query(
@@ -3391,10 +3440,45 @@ app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
       ]
     );
 
-    return res.status(201).json({ success: true, post: formatBlogRow(rows[0]) });
+    return res.status(201).json({ success: true, post: formatBlogRow(rows[0], requestBaseUrl) });
   } catch (error) {
     console.error('Failed to create blog post:', error);
     return res.status(500).json({ error: 'Failed to create blog post' });
+  }
+});
+
+app.delete('/api/blog/:id', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const blogId = Number(req.params.id);
+  if (!Number.isInteger(blogId) || blogId <= 0) {
+    return res.status(400).json({ error: 'Invalid blog id' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT image_urls, attachment_urls
+       FROM blog_posts
+       WHERE id = $1
+       LIMIT 1`,
+      [blogId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+
+    const images = parseJsonArray(rows[0].image_urls);
+    const attachments = parseJsonArray(rows[0].attachment_urls);
+
+    await pool.query('DELETE FROM blog_posts WHERE id = $1', [blogId]);
+    await deleteBlogFiles([...images, ...attachments]);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete blog post:', error);
+    return res.status(500).json({ error: 'Failed to delete blog post' });
   }
 });
 

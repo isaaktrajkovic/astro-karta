@@ -467,6 +467,12 @@ export const createBlogPost = async (payload: {
   return data as { success: true; post: BlogPost };
 };
 
+export const deleteBlogPost = (id: number) =>
+  request<{ success: true }>(`/api/blog/${id}`, {
+    method: 'DELETE',
+    auth: true,
+  });
+
 export const trackUsage = (payload: Pick<CalculatorUsage, 'sign1' | 'sign2' | 'compatibility'>) =>
   request<{ success: true }>('/api/usage', {
     method: 'POST',
