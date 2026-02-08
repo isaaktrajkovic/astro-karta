@@ -2124,6 +2124,7 @@ const Dashboard = () => {
               {language === 'sr' ? 'Sekcija za blog je sakrivena.' : 'Blog section is hidden.'}
             </div>
           ) : (
+            <div className="space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-card rounded-xl border border-border p-6 space-y-4">
               <h3 className="text-lg font-semibold text-foreground">
@@ -2370,6 +2371,7 @@ const Dashboard = () => {
                 ))}
               </div>
             )}
+          </div>
           </div>
           )}
         </div>
