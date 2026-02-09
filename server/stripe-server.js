@@ -1139,7 +1139,7 @@ const normalizeExternalImageUrl = (value) => {
   const driveUcMatch = url.match(/drive\.google\.com\/uc\?[^#]*id=([^&]+)/i);
   const fileId = driveFileMatch?.[1] || driveOpenMatch?.[1] || driveUcMatch?.[1];
   if (fileId) {
-    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
   }
   return url;
 };
@@ -3461,10 +3461,20 @@ app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
     const requestBaseUrl = getRequestBaseUrl(req);
     const uploadedImages = (req.files?.images || []).map((file) => buildBlogAsset(requestBaseUrl, file));
     const attachments = (req.files?.attachments || []).map((file) => buildBlogAsset(requestBaseUrl, file));
-    const externalImageUrls = parseUrlList(req.body?.image_urls || req.body?.imageUrls)
+    const coverImageUrl = req.body?.cover_image_url || req.body?.coverImageUrl;
+    const inlineImageUrl = req.body?.inline_image_url || req.body?.inlineImageUrl;
+    const externalCover = buildExternalBlogAsset(coverImageUrl);
+    const externalInline = buildExternalBlogAsset(inlineImageUrl);
+    const legacyExternal = parseUrlList(req.body?.image_urls || req.body?.imageUrls)
       .map(buildExternalBlogAsset)
       .filter(Boolean);
-    const images = [...uploadedImages, ...externalImageUrls];
+    const images = [];
+    const coverImage = uploadedImages[0] || externalCover || legacyExternal.shift();
+    const inlineImage = uploadedImages[1] || externalInline || legacyExternal.shift();
+    if (coverImage) images.push(coverImage);
+    if (inlineImage) images.push(inlineImage);
+    if (uploadedImages.length > 2) images.push(...uploadedImages.slice(2));
+    if (legacyExternal.length) images.push(...legacyExternal);
     const excerpt = excerptInput || createExcerpt(content);
 
     const { rows } = await pool.query(

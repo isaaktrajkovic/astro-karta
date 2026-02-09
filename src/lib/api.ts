@@ -162,6 +162,7 @@ export interface BlogAsset {
   url: string;
   name: string;
   mime?: string;
+  role?: 'cover' | 'inline';
 }
 
 export interface BlogPost {
@@ -460,6 +461,8 @@ export const createBlogPost = async (payload: {
   images?: File[];
   attachments?: File[];
   imageUrls?: string[];
+  coverImageUrl?: string;
+  inlineImageUrl?: string;
 }) => {
   const formData = new FormData();
   formData.append('title', payload.title);
@@ -467,6 +470,12 @@ export const createBlogPost = async (payload: {
     formData.append('excerpt', payload.excerpt);
   }
   formData.append('content', payload.content);
+  if (payload.coverImageUrl) {
+    formData.append('cover_image_url', payload.coverImageUrl);
+  }
+  if (payload.inlineImageUrl) {
+    formData.append('inline_image_url', payload.inlineImageUrl);
+  }
   if (payload.imageUrls?.length) {
     formData.append('image_urls', payload.imageUrls.join('\n'));
   }

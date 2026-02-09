@@ -415,21 +415,17 @@ const BlogPost = () => {
 
   const renderDynamicContent = (content: string, images: BlogAsset[]) => {
     const paragraphs = content.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
-    const imageGrid = images.length ? (
-      <div className="grid gap-4 md:grid-cols-2">
-        {images.map((image) => (
-          <img
-            key={image.url}
-            src={normalizeExternalImageUrl(image.url)}
-            alt={image.name || 'Blog image'}
-            className="w-full rounded-xl border border-border object-cover"
-          />
-        ))}
-      </div>
+    const inlineImage = images[1];
+    const inlineImageBlock = inlineImage ? (
+      <img
+        src={normalizeExternalImageUrl(inlineImage.url)}
+        alt={inlineImage.name || 'Blog image'}
+        className="w-full rounded-xl border border-border object-cover"
+      />
     ) : null;
 
     if (!paragraphs.length) {
-      return imageGrid;
+      return inlineImageBlock;
     }
 
     return (
@@ -439,7 +435,7 @@ const BlogPost = () => {
             <p className="text-muted-foreground leading-relaxed">
               {renderInlineContent(paragraph)}
             </p>
-            {index === 0 && imageGrid}
+            {index === 0 && inlineImageBlock}
           </div>
         ))}
       </div>

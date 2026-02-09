@@ -139,7 +139,8 @@ const Dashboard = () => {
   const [blogTitle, setBlogTitle] = useState('');
   const [blogExcerpt, setBlogExcerpt] = useState('');
   const [blogContent, setBlogContent] = useState('');
-  const [blogImageUrls, setBlogImageUrls] = useState('');
+  const [blogCoverImageUrl, setBlogCoverImageUrl] = useState('');
+  const [blogInlineImageUrl, setBlogInlineImageUrl] = useState('');
   const [blogImages, setBlogImages] = useState<File[]>([]);
   const [blogAttachments, setBlogAttachments] = useState<File[]>([]);
   const [blogSaving, setBlogSaving] = useState(false);
@@ -336,7 +337,8 @@ const Dashboard = () => {
     setBlogTitle('');
     setBlogExcerpt('');
     setBlogContent('');
-    setBlogImageUrls('');
+    setBlogCoverImageUrl('');
+    setBlogInlineImageUrl('');
     setBlogImages([]);
     setBlogAttachments([]);
   };
@@ -376,12 +378,6 @@ const Dashboard = () => {
   const handleRemoveBlogAttachment = (index: number) => {
     setBlogAttachments((prev) => prev.filter((_, idx) => idx !== index));
   };
-
-  const parseBlogImageUrls = (value: string) =>
-    value
-      .split(/[\n,]+/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
 
   const wrapBlogContentSelection = (prefix: string, suffix = prefix, placeholder = '') => {
     const textarea = blogContentRef.current;
@@ -425,7 +421,8 @@ const Dashboard = () => {
     const title = blogTitle.trim();
     const content = blogContent.trim();
     const excerpt = blogExcerpt.trim();
-    const imageUrls = parseBlogImageUrls(blogImageUrls);
+    const coverImageUrl = blogCoverImageUrl.trim();
+    const inlineImageUrl = blogInlineImageUrl.trim();
 
     if (!title || !content) {
       toast({
@@ -444,7 +441,8 @@ const Dashboard = () => {
         title,
         excerpt: excerpt || undefined,
         content,
-        imageUrls,
+        coverImageUrl: coverImageUrl || undefined,
+        inlineImageUrl: inlineImageUrl || undefined,
         images: blogImages,
         attachments: blogAttachments,
       });
@@ -2218,17 +2216,37 @@ const Dashboard = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="blog-image-urls">
-                    {language === 'sr' ? 'Linkovi ka slikama (opciono)' : 'Image URLs (optional)'}
+                  <Label htmlFor="blog-cover-image-url">
+                    {language === 'sr'
+                      ? 'Link za naslovnu sliku (početna + vrh posta)'
+                      : 'Cover image URL (homepage + top)'}
                   </Label>
-                  <Textarea
-                    id="blog-image-urls"
-                    value={blogImageUrls}
-                    onChange={(event) => setBlogImageUrls(event.target.value)}
+                  <Input
+                    id="blog-cover-image-url"
+                    type="url"
+                    value={blogCoverImageUrl}
+                    onChange={(event) => setBlogCoverImageUrl(event.target.value)}
                     placeholder={language === 'sr'
-                      ? 'Jedan URL po liniji ili odvojeno zarezom. Link mora biti javan.'
-                      : 'One URL per line or separated by commas. The link must be public.'}
-                    rows={3}
+                      ? 'https://... (javni link)'
+                      : 'https://... (public link)'}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blog-inline-image-url">
+                    {language === 'sr'
+                      ? 'Link za sliku nakon prvog pasusa'
+                      : 'Image URL after the first paragraph'}
+                  </Label>
+                  <Input
+                    id="blog-inline-image-url"
+                    type="url"
+                    value={blogInlineImageUrl}
+                    onChange={(event) => setBlogInlineImageUrl(event.target.value)}
+                    placeholder={language === 'sr'
+                      ? 'https://... (javni link)'
+                      : 'https://... (public link)'}
                     className="bg-secondary/50 border-border focus:border-primary"
                   />
                   <p className="text-xs text-muted-foreground">
@@ -2240,7 +2258,9 @@ const Dashboard = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="blog-images">
-                    {language === 'sr' ? 'Slike (do 2)' : 'Images (up to 2)'}
+                    {language === 'sr'
+                      ? 'Slike (do 2) — prva je naslovna, druga ide posle prvog pasusa'
+                      : 'Images (up to 2) — first is cover, second goes after the first paragraph'}
                   </Label>
                   <Input
                     id="blog-images"
@@ -2254,7 +2274,18 @@ const Dashboard = () => {
                     <div className="space-y-2 text-sm text-muted-foreground">
                       {blogImages.map((file, index) => (
                         <div key={`${file.name}-${index}`} className="flex items-center justify-between">
-                          <span>{file.name}</span>
+                          <span>
+                            {file.name}
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {language === 'sr'
+                                ? index === 0
+                                  ? '(naslovna)'
+                                  : '(posle prvog pasusa)'
+                                : index === 0
+                                  ? '(cover)'
+                                  : '(after first paragraph)'}
+                            </span>
+                          </span>
                           <Button
                             type="button"
                             variant="ghost"
