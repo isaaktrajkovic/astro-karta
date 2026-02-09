@@ -1,4 +1,16 @@
-const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+const resolveApiBase = () => {
+  const envBase = import.meta.env.VITE_API_BASE_URL;
+  if (envBase) return envBase;
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.endsWith('astrowhisper.net')) {
+      return 'https://astro-karta-8ius.onrender.com';
+    }
+  }
+  return '';
+};
+
+const apiBase = resolveApiBase();
 
 const authTokenKey = 'astro_admin_token';
 
@@ -282,7 +294,14 @@ export const login = async (email: string, password: string) => {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
-  setAuthToken(data.token);
+  if (!data || typeof data !== 'object' || !('token' in data)) {
+    throw new Error('API base URL nije podešen ili server ne vraća validan odgovor.');
+  }
+  const token = (data as { token: string }).token;
+  if (!token) {
+    throw new Error('Token nije primljen. Proverite API konfiguraciju.');
+  }
+  setAuthToken(token);
   return data;
 };
 
