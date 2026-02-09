@@ -415,7 +415,7 @@ const BlogPost = () => {
 
   const renderDynamicContent = (content: string, images: BlogAsset[]) => {
     const paragraphs = content.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
-    const inlineImage = images[1];
+    const inlineImage = images.find((image) => image.role === 'inline') || images[1];
     const inlineImageBlock = inlineImage ? (
       <img
         src={normalizeExternalImageUrl(inlineImage.url)}
@@ -471,8 +471,9 @@ const BlogPost = () => {
     ? (language === 'sr' ? staticPost.titleSr : staticPost.titleEn)
     : (dynamicPost?.title || '');
   const date = staticPost?.date || dynamicPost?.published_at || dynamicPost?.created_at || '';
+  const coverImage = dynamicPost?.images?.find((image) => image.role === 'cover') || dynamicPost?.images?.[0];
   const heroImageUrl =
-    normalizeExternalImageUrl(staticPost?.image || dynamicPost?.images?.[0]?.url || '') || heroImage;
+    normalizeExternalImageUrl(staticPost?.image || coverImage?.url || '') || heroImage;
   const staticContent = staticPost ? (language === 'sr' ? staticPost.contentSr : staticPost.contentEn) : '';
   const attachments = dynamicPost?.attachments || [];
   const productInfo = staticPost?.productId ? productData[staticPost.productId] : null;

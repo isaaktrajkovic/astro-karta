@@ -83,14 +83,17 @@ const Blog = () => {
   }, []);
 
   const combinedPosts = useMemo(() => {
-    const normalizedDynamic = dynamicPosts.map((post) => ({
-      id: `dynamic-${post.id}`,
-      slug: post.slug,
-      title: post.title,
-      excerpt: post.excerpt,
-      date: post.published_at || post.created_at,
-      image: normalizeExternalImageUrl(post.images?.[0]?.url || '') || heroImage,
-    }));
+    const normalizedDynamic = dynamicPosts.map((post) => {
+      const coverImage = post.images?.find((image) => image.role === 'cover') || post.images?.[0];
+      return {
+        id: `dynamic-${post.id}`,
+        slug: post.slug,
+        title: post.title,
+        excerpt: post.excerpt,
+        date: post.published_at || post.created_at,
+        image: normalizeExternalImageUrl(coverImage?.url || '') || heroImage,
+      };
+    });
 
     const normalizedStatic = blogPosts.map((post) => ({
       id: post.id,

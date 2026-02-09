@@ -1157,6 +1157,14 @@ const normalizeAssetList = (assets, baseUrl) =>
     return { ...asset, url };
   });
 
+const applyLegacyBlogImageRoles = (assets = []) =>
+  assets.map((asset, index) => {
+    if (!asset || asset.role) return asset;
+    if (index === 0) return { ...asset, role: 'cover' };
+    if (index === 1) return { ...asset, role: 'inline' };
+    return asset;
+  });
+
 const buildBlogAsset = (baseUrl, file) => ({
   url: `${baseUrl}/uploads/blog/${file.filename}`,
   name: file.originalname,
@@ -3368,11 +3376,16 @@ const handleBlogUpload = (req, res, next) => {
   });
 };
 
-const formatBlogRow = (row, baseUrl) => ({
-  ...row,
-  images: normalizeAssetList(parseJsonArray(row.image_urls), baseUrl),
-  attachments: normalizeAssetList(parseJsonArray(row.attachment_urls), baseUrl),
-});
+const formatBlogRow = (row, baseUrl) => {
+  const images = applyLegacyBlogImageRoles(
+    normalizeAssetList(parseJsonArray(row.image_urls), baseUrl)
+  );
+  return {
+    ...row,
+    images,
+    attachments: normalizeAssetList(parseJsonArray(row.attachment_urls), baseUrl),
+  };
+};
 
 app.get('/api/blog', async (req, res) => {
   if (!pool) {
@@ -3471,8 +3484,8 @@ app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
     const images = [];
     const coverImage = uploadedImages[0] || externalCover || legacyExternal.shift();
     const inlineImage = uploadedImages[1] || externalInline || legacyExternal.shift();
-    if (coverImage) images.push(coverImage);
-    if (inlineImage) images.push(inlineImage);
+    if (coverImage) images.push({ ...coverImage, role: 'cover' });
+    if (inlineImage) images.push({ ...inlineImage, role: 'inline' });
     if (uploadedImages.length > 2) images.push(...uploadedImages.slice(2));
     if (legacyExternal.length) images.push(...legacyExternal);
     const excerpt = excerptInput || createExcerpt(content);
