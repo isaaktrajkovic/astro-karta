@@ -440,6 +440,7 @@ export const createBlogPost = async (payload: {
   content: string;
   images?: File[];
   attachments?: File[];
+  imageUrls?: string[];
 }) => {
   const formData = new FormData();
   formData.append('title', payload.title);
@@ -447,6 +448,9 @@ export const createBlogPost = async (payload: {
     formData.append('excerpt', payload.excerpt);
   }
   formData.append('content', payload.content);
+  if (payload.imageUrls?.length) {
+    formData.append('image_urls', payload.imageUrls.join('\n'));
+  }
   payload.images?.forEach((file) => formData.append('images', file));
   payload.attachments?.forEach((file) => formData.append('attachments', file));
 

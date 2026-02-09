@@ -139,6 +139,7 @@ const Dashboard = () => {
   const [blogTitle, setBlogTitle] = useState('');
   const [blogExcerpt, setBlogExcerpt] = useState('');
   const [blogContent, setBlogContent] = useState('');
+  const [blogImageUrls, setBlogImageUrls] = useState('');
   const [blogImages, setBlogImages] = useState<File[]>([]);
   const [blogAttachments, setBlogAttachments] = useState<File[]>([]);
   const [blogSaving, setBlogSaving] = useState(false);
@@ -335,6 +336,7 @@ const Dashboard = () => {
     setBlogTitle('');
     setBlogExcerpt('');
     setBlogContent('');
+    setBlogImageUrls('');
     setBlogImages([]);
     setBlogAttachments([]);
   };
@@ -374,6 +376,12 @@ const Dashboard = () => {
   const handleRemoveBlogAttachment = (index: number) => {
     setBlogAttachments((prev) => prev.filter((_, idx) => idx !== index));
   };
+
+  const parseBlogImageUrls = (value: string) =>
+    value
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
 
   const wrapBlogContentSelection = (prefix: string, suffix = prefix, placeholder = '') => {
     const textarea = blogContentRef.current;
@@ -417,6 +425,7 @@ const Dashboard = () => {
     const title = blogTitle.trim();
     const content = blogContent.trim();
     const excerpt = blogExcerpt.trim();
+    const imageUrls = parseBlogImageUrls(blogImageUrls);
 
     if (!title || !content) {
       toast({
@@ -435,6 +444,7 @@ const Dashboard = () => {
         title,
         excerpt: excerpt || undefined,
         content,
+        imageUrls,
         images: blogImages,
         attachments: blogAttachments,
       });
@@ -2208,6 +2218,22 @@ const Dashboard = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="blog-image-urls">
+                    {language === 'sr' ? 'Linkovi ka slikama (opciono)' : 'Image URLs (optional)'}
+                  </Label>
+                  <Textarea
+                    id="blog-image-urls"
+                    value={blogImageUrls}
+                    onChange={(event) => setBlogImageUrls(event.target.value)}
+                    placeholder={language === 'sr'
+                      ? 'Jedan URL po liniji ili odvojeno zarezom.'
+                      : 'One URL per line or separated by commas.'}
+                    rows={3}
+                    className="bg-secondary/50 border-border focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="blog-images">
                     {language === 'sr' ? 'Slike (do 2)' : 'Images (up to 2)'}
                   </Label>
@@ -2301,6 +2327,11 @@ const Dashboard = () => {
                   {language === 'sr'
                     ? 'Slike će se prikazati u tekstu odmah posle prvog pasusa.'
                     : 'Images will appear in the text right after the first paragraph.'}
+                </li>
+                <li>
+                  {language === 'sr'
+                    ? 'Možeš dodati i linkove ka slikama (npr. iz clouda) ako ne želiš upload.'
+                    : 'You can also paste image links (cloud URLs) instead of uploading.'}
                 </li>
                 <li>
                   {language === 'sr'

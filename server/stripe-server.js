@@ -1076,6 +1076,24 @@ const parseJsonArray = (value) => {
   }
 };
 
+const parseUrlList = (value) => {
+  if (!value) return [];
+  const raw = Array.isArray(value) ? value.join('\n') : String(value);
+  if (!raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  } catch {
+    // fall through to split
+  }
+  return raw
+    .split(/[\n,]+/)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+};
+
 const blogUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, blogUploadsDir),
@@ -1131,6 +1149,20 @@ const buildBlogAsset = (baseUrl, file) => ({
   name: file.originalname,
   mime: file.mimetype,
 });
+
+const buildExternalBlogAsset = (value) => {
+  try {
+    const url = String(value || '').trim();
+    if (!url) return null;
+    const href = url.startsWith('http') ? url : `https://${url}`;
+    const parsed = new URL(href);
+    if (!/^https?:$/.test(parsed.protocol)) return null;
+    const name = path.basename(parsed.pathname || '') || parsed.hostname;
+    return { url: href, name };
+  } catch {
+    return null;
+  }
+};
 
 const deleteBlogFiles = async (assets = []) => {
   if (!assets.length) return;
@@ -3414,8 +3446,12 @@ app.post('/api/blog', requireAuth, handleBlogUpload, async (req, res) => {
     const slugBase = normalizeBlogSlug(title) || 'blog-post';
     const slug = await ensureUniqueBlogSlug(slugBase);
     const requestBaseUrl = getRequestBaseUrl(req);
-    const images = (req.files?.images || []).map((file) => buildBlogAsset(requestBaseUrl, file));
+    const uploadedImages = (req.files?.images || []).map((file) => buildBlogAsset(requestBaseUrl, file));
     const attachments = (req.files?.attachments || []).map((file) => buildBlogAsset(requestBaseUrl, file));
+    const externalImageUrls = parseUrlList(req.body?.image_urls || req.body?.imageUrls)
+      .map(buildExternalBlogAsset)
+      .filter(Boolean);
+    const images = [...uploadedImages, ...externalImageUrls];
     const excerpt = excerptInput || createExcerpt(content);
 
     const { rows } = await pool.query(
