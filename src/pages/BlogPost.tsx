@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderDialog from '@/components/OrderDialog';
 import { BlogAsset, BlogPost as ApiBlogPost, getBlogPost } from '@/lib/api';
+import { normalizeExternalImageUrl } from '@/lib/blog';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 const productData: Record<string, { titleSr: string; titleEn: string; priceCents: number }> = {
@@ -419,7 +420,7 @@ const BlogPost = () => {
         {images.map((image) => (
           <img
             key={image.url}
-            src={image.url}
+            src={normalizeExternalImageUrl(image.url)}
             alt={image.name || 'Blog image'}
             className="w-full rounded-xl border border-border object-cover"
           />
@@ -474,7 +475,8 @@ const BlogPost = () => {
     ? (language === 'sr' ? staticPost.titleSr : staticPost.titleEn)
     : (dynamicPost?.title || '');
   const date = staticPost?.date || dynamicPost?.published_at || dynamicPost?.created_at || '';
-  const heroImageUrl = staticPost?.image || dynamicPost?.images?.[0]?.url || heroImage;
+  const heroImageUrl =
+    normalizeExternalImageUrl(staticPost?.image || dynamicPost?.images?.[0]?.url || '') || heroImage;
   const staticContent = staticPost ? (language === 'sr' ? staticPost.contentSr : staticPost.contentEn) : '';
   const attachments = dynamicPost?.attachments || [];
   const productInfo = staticPost?.productId ? productData[staticPost.productId] : null;

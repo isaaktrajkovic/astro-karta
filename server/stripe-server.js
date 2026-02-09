@@ -1131,17 +1131,30 @@ const getRequestBaseUrl = (req) => {
   return normalizedApiBaseUrl;
 };
 
+const normalizeExternalImageUrl = (value) => {
+  const url = String(value || '').trim();
+  if (!url) return url;
+  const driveFileMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)\//i);
+  const driveOpenMatch = url.match(/drive\.google\.com\/open\?id=([^&]+)/i);
+  const driveUcMatch = url.match(/drive\.google\.com\/uc\?[^#]*id=([^&]+)/i);
+  const fileId = driveFileMatch?.[1] || driveOpenMatch?.[1] || driveUcMatch?.[1];
+  if (fileId) {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  }
+  return url;
+};
+
 const normalizeAssetList = (assets, baseUrl) =>
   (assets || []).map((asset) => {
     if (!asset || !asset.url) return asset;
-    const url = String(asset.url);
+    const url = normalizeExternalImageUrl(asset.url);
     if (url.startsWith('/')) {
       return { ...asset, url: `${baseUrl}${url}` };
     }
     if (/^https?:\/\/localhost(?::\d+)?\//i.test(url)) {
       return { ...asset, url: url.replace(/^https?:\/\/localhost(?::\d+)?/i, baseUrl) };
     }
-    return asset;
+    return { ...asset, url };
   });
 
 const buildBlogAsset = (baseUrl, file) => ({
@@ -1158,7 +1171,7 @@ const buildExternalBlogAsset = (value) => {
     const parsed = new URL(href);
     if (!/^https?:$/.test(parsed.protocol)) return null;
     const name = path.basename(parsed.pathname || '') || parsed.hostname;
-    return { url: href, name };
+    return { url: normalizeExternalImageUrl(href), name };
   } catch {
     return null;
   }

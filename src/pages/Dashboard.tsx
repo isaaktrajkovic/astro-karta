@@ -2226,11 +2226,16 @@ const Dashboard = () => {
                     value={blogImageUrls}
                     onChange={(event) => setBlogImageUrls(event.target.value)}
                     placeholder={language === 'sr'
-                      ? 'Jedan URL po liniji ili odvojeno zarezom.'
-                      : 'One URL per line or separated by commas.'}
+                      ? 'Jedan URL po liniji ili odvojeno zarezom. Link mora biti javan.'
+                      : 'One URL per line or separated by commas. The link must be public.'}
                     rows={3}
                     className="bg-secondary/50 border-border focus:border-primary"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'sr'
+                      ? 'Ako koristite Google Drive, obavezno podelite sliku kao javni link.'
+                      : 'If you use Google Drive, make sure the image is shared publicly.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

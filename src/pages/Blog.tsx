@@ -4,6 +4,7 @@ import { ArrowRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getBlogPosts, BlogPost as ApiBlogPost } from '@/lib/api';
+import { normalizeExternalImageUrl } from '@/lib/blog';
 import heroImage from '@/assets/hero-zodiac.jpg';
 
 interface BlogPost {
@@ -88,7 +89,7 @@ const Blog = () => {
       title: post.title,
       excerpt: post.excerpt,
       date: post.published_at || post.created_at,
-      image: post.images?.[0]?.url || heroImage,
+      image: normalizeExternalImageUrl(post.images?.[0]?.url || '') || heroImage,
     }));
 
     const normalizedStatic = blogPosts.map((post) => ({
