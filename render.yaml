@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: astro-karta-api
+    env: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node server/stripe-server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18
