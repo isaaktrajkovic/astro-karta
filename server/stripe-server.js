@@ -1139,7 +1139,7 @@ const normalizeExternalImageUrl = (value) => {
   const driveUcMatch = url.match(/drive\.google\.com\/uc\?[^#]*id=([^&]+)/i);
   const fileId = driveFileMatch?.[1] || driveOpenMatch?.[1] || driveUcMatch?.[1];
   if (fileId) {
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
   }
   return url;
 };
